@@ -186,13 +186,93 @@ function createRenderBlock(renderPageName, titleblockUID){
     
 }
 
+function createCSSBlock(parentUID){
+    // creates the initial code block and its parent
+    // adding this to the roam/css page so users can use it as an example
+    // if roam/css page doesn't exist then create it
+    let pageUID = getPageUidByPageTitle('roam/css') || createPage('roam/css');
+    let blockUID = roamAlphaAPI.util.generateUID();
+    // create closed parent block
+    roamAlphaAPI
+    .createBlock(
+        {"location": 
+            {"parent-uid": pageUID, 
+            "order": "last"}, 
+        "block": 
+            {"string": `TODO PROGRESS BAR STYLE [[${uidForToday()}]]`,
+            "uid":parentUID,
+            "open":false,
+            "heading":3}})
+    
+    // create codeblock for a todo progress bar
+    // I do this so that a user can see and modify the CSS
+    let css = `
+:root{
+    --progress-bar-default:#137cbd;
+    --progress-bar:#137cbd;
+    --progress-border:#B6B6B6;
+    --progress-bg:#dfe2e5;
+}
+:root .rm-dark-theme {
+    --progress-border:#137cbd;
+    --progress-bg:#EFEFEF;
+}
+    
+progress[name="percent-done"],
+.todo-progress-bar progress{
+    display:inline-block;
+    height:6px;
+    background:none;
+    border-radius: 15px;
+    margin-bottom:2px;
+}
+    
+progress::-webkit-progress-bar,
+.todo-progress-bar progress::-webkit-progress-bar{
+    height:6px;
+    background-color: var(--progress-bg);
+    border-radius: 15px;
+}
+
+.rm-dark-theme progress::-webkit-progress-bar,
+.rm-dark-theme .todo-progress-bar progress::-webkit-progress-bar{
+  box-shadow:0px 0px 6px var(--progress-border) inset;
+}
+
+progress::-webkit-progress-value,
+.todo-progress-bar progress::-webkit-progress-value{
+    display:inline-block;
+    float:left;
+    height:6px;
+    margin:0px -10px 0 0;
+    background: var(--progress-bar);
+    border-radius: 5px;
+}
+    `;
+
+    let blockString = "```css\n " + css + " ```"
+    roamAlphaAPI
+    .createBlock(
+        {"location": 
+            {"parent-uid": parentUID, 
+            "order": 0}, 
+        "block": 
+            {"uid": blockUID,
+            "string": blockString}})
+
+}
+
 export default function toggleProgressBar(state) {
     let titleblockUID = 'todo-progress';
     let renderPageName = 'roam/render'
-    
+    // css
+    let codeBlockParentUID = 'todo-progress-css-parent';
+
     if (state==true) {
         createRenderBlock(renderPageName, titleblockUID)
+        createCSSBlock(codeBlockParentUID);
     } else if(state==false){
         removeCodeBlock(titleblockUID)
+        removeCodeBlock(codeBlockParentUID)
     }
 }

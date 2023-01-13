@@ -1,4 +1,3 @@
-import "index.css";
 import toggleProgressBar from "./todo_progress_bar";
 
 function findBlockByUID(uid){
