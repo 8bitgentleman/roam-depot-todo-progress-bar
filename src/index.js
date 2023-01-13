@@ -1,42 +1,25 @@
-const panelConfig = {
-  tabTitle: "Test Ext 1",
-  settings: [
-      {id:          "button-setting",
-       name:        "Button test",
-       description: "tests the button",
-       action:      {type:    "button",
-                     onClick: (evt) => { console.log("Button clicked!"); },
-                     content: "Button"}},
-      {id:          "switch-setting",
-       name:        "Switch Test",
-       description: "Test switch component",
-       action:      {type:     "switch",
-                     onChange: (evt) => { console.log("Switch!", evt); }}},
-      {id:     "input-setting",
-       name:   "Input test",
-       action: {type:        "input",
-                placeholder: "placeholder",
-                onChange:    (evt) => { console.log("Input Changed!", evt); }}},
-      {id:     "select-setting",
-       name:   "Select test",
-       action: {type:     "select",
-                items:    ["one", "two", "three"],
-                onChange: (evt) => { console.log("Select Changed!", evt); }}}
-  ]
-};
+import "index.css";
+import toggleProgressBar from "./todo_progress_bar";
 
-async function onload({extensionAPI}) {
-  // set defaults if they dont' exist
-  if (!extensionAPI.settings.get('data')) {
-      await extensionAPI.settings.set('data', "01");
+function findBlockByUID(uid){
+  return roamAlphaAPI.q(
+      `[:find (pull ?e [:block/uid]) :where [?e :block/uid "${uid}"]]`
+      )?.[0]?.[0].uid || null
+}
+
+function onload({extensionAPI}) {
+  let titleblockUID = 'todo-progress';
+  if (!roamAlphaAPI.data.pull("[*]", [":block/uid", titleblockUID])) {
+    // component hasn't been loaded so we add it to the graph
+    toggleProgressBar(true)
   }
-  extensionAPI.settings.panel.create(panelConfig);
 
   console.log("load example plugin");
 }
 
 function onunload() {
   console.log("unload example plugin");
+  toggleProgressBar(false)
 }
 
 export default {
