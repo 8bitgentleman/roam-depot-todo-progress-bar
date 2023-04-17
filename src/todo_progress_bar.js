@@ -86,7 +86,8 @@ function createRenderBlock(renderPageName, titleblockUID){
     [datascript.core :as d]
     [roam.datascript.reactive :as dr]
     [clojure.pprint :as pp]))
-
+; THIS CODEBLOCK IS OVERWRITTEN ON EVERY VERSION UPDATE
+; DO NOT MODIFY
 (defn flatten-block 
 "Flattens a blocks children into a flat list"
 [acc block]
@@ -207,6 +208,8 @@ function createCSSBlock(parentUID){
     // create codeblock for a todo progress bar
     // I do this so that a user can see and modify the CSS
     let css = `
+/* THIS CODEBLOCK IS OVERWRITTEN ON EVERY VERSION UPDATE
+DO NOT MODIFY*/
 :root{
     --progress-bar-default:#137cbd;
     --progress-bar:#137cbd;
@@ -260,6 +263,12 @@ progress::-webkit-progress-value,
             {"uid": blockUID,
             "string": blockString}})
 
+}
+
+function replaceRenderString(){
+    // replaces the {{[[roam/render]]:((5juEDRY_n))}} string across the entire graph
+    // I do this because when the original block is deleted Roam leaves massive codeblocks wherever it was ref'd
+    // also allows me to re-add back if a user uninstalls and then re-installs
 }
 
 export default function toggleProgressBar(state) {
