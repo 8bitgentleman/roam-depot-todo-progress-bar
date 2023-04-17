@@ -29,7 +29,7 @@ function createRenderBlock(renderPageName, titleblockUID){
     let renderPageUID = getPageUidByPageTitle(renderPageName)|| createPage(renderPageName);
     let templateBlockUID = roamAlphaAPI.util.generateUID()
     let codeBlockHeaderUID = roamAlphaAPI.util.generateUID()
-    let codeBlockUID = roamAlphaAPI.util.generateUID()
+    let codeBlockUID = 'roam-render-todo-progress-code-block';
     let renderBlockUID = roamAlphaAPI.util.generateUID()
 
     // create the titleblock
