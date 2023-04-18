@@ -1,5 +1,8 @@
+import cssFile from "./todo-progress-bar.css";
+import clsjFile from "./todo-progress-bar.cljs";
 const codeBlockUID = 'roam-render-todo-progress-cljs';
 const cssBlockUID = 'roam-render-todo-progress-css';
+const version = 'v11'
 
 function removeCodeBlock(uid){
     roamAlphaAPI.deleteBlock({"block":{"uid": uid}})
@@ -54,7 +57,7 @@ function createRenderBlock(renderPageName, titleblockUID){
             {"parent-uid": titleblockUID, 
             "order": 0}, 
         "block": 
-            {"string": `TODO Progress Bar v10 [[roam/templates]]`,
+            {"string": `TODO Progress Bar ${version} [[roam/templates]]`,
             "uid":templateBlockUID,
             "open":true}})
     // create the render component block
@@ -81,101 +84,7 @@ function createRenderBlock(renderPageName, titleblockUID){
 
             // create codeblock for the component
 
-    let cljs = `
-(ns progress-bar-v10
-(:require
-    [reagent.core :as r]
-    [datascript.core :as d]
-    [roam.datascript.reactive :as dr]
-    [clojure.pprint :as pp]))
-; THIS CODEBLOCK IS OVERWRITTEN ON EVERY VERSION UPDATE
-; DO NOT MODIFY
-(defn flatten-block 
-"Flattens a blocks children into a flat list"
-[acc block]
-(reduce flatten-block
-        (conj acc (dissoc block :block/children))
-        (:block/children block)))
-
-(defn find-child-refs
-"Returns all _refs for children blocks given a parent block uid"
-[block-uid]
-(flatten-block []
-            @(dr/q '[:find (pull ?e [:block/refs{:block/children ...}]) .
-                    :in $ ?uid
-                    :where
-                    [?e :block/uid ?uid]]
-                    block-uid)))
-
-(defn id-title 
-"Gets a page's title from its db id"
-[id]
-(:node/title @(dr/pull '[:node/title] id))
-)
-
-(defn info-from-id [id]
-    (or (:node/title @(dr/pull '[:node/title] id))
-    (map
-        id-title 
-        (map 
-                :db/id
-                (:block/refs @(dr/pull '[:block/refs] id))
-        ))
-    )
-)
-
-(defn count-occurrences 
-"Counts the occurances of a string in a list"
-[s slist]
-(->> slist
-        flatten
-        (filter #{s})
-        count))
-
-
-(defn recurse-search
-"Recursivly search through a block's children for all pages referenced"
-[block-uid]
-(->> block-uid
-        (find-child-refs)
-        (map :block/refs)
-        (flatten)
-        (map :db/id)
-        (map  info-from-id)
-        (flatten)))
-
-
-(defn main [{:keys [block-uid]} & args]
-(let [tasks (r/atom {;; don't love that I do this search twice
-                        :todo (count-occurrences "TODO" (recurse-search block-uid))
-                        :done (count-occurrences "DONE" (recurse-search block-uid))} )]
-    
-    [:div
-            [:div {:style {:display "flex"
-                                :align-items "center"}
-                        }
-                    [:span [:progress {
-                    :id "file"
-                    :name "percent-done"
-                    :value (:done @tasks)
-                    :max (+ (:todo @tasks) (:done @tasks))
-                    :style{
-
-                            :margin-left "10px"
-                            :margin-right "10px"
-                            }}]
-                    ]
-                    [:span [:div  (str (:done @tasks)  "/"
-                                    (+ 
-                                        (:done @tasks)
-                                        (:todo @tasks))
-                                    " Done"
-                                    )]]
-
-                    ]
-            ]
-)); 
-                `;
+    let cljs = clsjFile
                 
     let blockString = "```clojure\n " + cljs + " ```"
     roamAlphaAPI
@@ -209,51 +118,7 @@ function createCSSBlock(parentUID){
     
     // create codeblock for a todo progress bar
     // I do this so that a user can see what to customize
-    let css = `
-/* THIS CODEBLOCK IS OVERWRITTEN ON EVERY VERSION UPDATE
-DO NOT MODIFY*/
-:root{
-    --progress-bar-default:#137cbd;
-    --progress-bar:#137cbd;
-    --progress-border:#B6B6B6;
-    --progress-bg:#dfe2e5;
-}
-:root .rm-dark-theme {
-    --progress-border:#137cbd;
-    --progress-bg:#EFEFEF;
-}
-    
-progress[name="percent-done"],
-.todo-progress-bar progress{
-    display:inline-block;
-    height:6px;
-    background:none;
-    border-radius: 15px;
-    margin-bottom:2px;
-}
-    
-progress::-webkit-progress-bar,
-.todo-progress-bar progress::-webkit-progress-bar{
-    height:6px;
-    background-color: var(--progress-bg);
-    border-radius: 15px;
-}
-
-.rm-dark-theme progress::-webkit-progress-bar,
-.rm-dark-theme .todo-progress-bar progress::-webkit-progress-bar{
-  box-shadow:0px 0px 6px var(--progress-border) inset;
-}
-
-progress::-webkit-progress-value,
-.todo-progress-bar progress::-webkit-progress-value{
-    display:inline-block;
-    float:left;
-    height:6px;
-    margin:0px -10px 0 0;
-    background: var(--progress-bar);
-    border-radius: 5px;
-}
-    `;
+    let css = cssFile.toString();
 
     let blockString = "```css\n " + css + " ```"
     roamAlphaAPI

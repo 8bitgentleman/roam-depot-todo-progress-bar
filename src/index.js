@@ -11,6 +11,7 @@ function onload({extensionAPI}) {
   if (!roamAlphaAPI.data.pull("[*]", [":block/uid", titleblockUID])) {
     // component hasn't been loaded so we add it to the graph
     toggleProgressBar(true)
+    // console.log(clsjFile)
   }
 
   console.log("load todo progress bar plugin");
