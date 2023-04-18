@@ -1,4 +1,4 @@
-import toggleProgressBar from "./todo_progress_bar";
+import toggleProgressBar from "./entry-helpers";
 
 function findBlockByUID(uid){
   return roamAlphaAPI.q(
@@ -7,17 +7,17 @@ function findBlockByUID(uid){
 }
 
 function onload({extensionAPI}) {
-  let titleblockUID = 'todo-progress';
+  let titleblockUID = 'roam-render-todo-progress';
   if (!roamAlphaAPI.data.pull("[*]", [":block/uid", titleblockUID])) {
     // component hasn't been loaded so we add it to the graph
     toggleProgressBar(true)
   }
 
-  console.log("load example plugin");
+  console.log("load todo progress bar plugin");
 }
 
 function onunload() {
-  console.log("unload example plugin");
+  console.log("unload todo progress bar plugin");
   toggleProgressBar(false)
 }
 

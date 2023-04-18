@@ -1,3 +1,6 @@
+const codeBlockUID = 'roam-render-todo-progress-cljs';
+const cssBlockUID = 'roam-render-todo-progress-css';
+
 function removeCodeBlock(uid){
     roamAlphaAPI.deleteBlock({"block":{"uid": uid}})
 }
@@ -29,7 +32,6 @@ function createRenderBlock(renderPageName, titleblockUID){
     let renderPageUID = getPageUidByPageTitle(renderPageName)|| createPage(renderPageName);
     let templateBlockUID = roamAlphaAPI.util.generateUID()
     let codeBlockHeaderUID = roamAlphaAPI.util.generateUID()
-    let codeBlockUID = 'roam-render-todo-progress-code-block';
     let renderBlockUID = roamAlphaAPI.util.generateUID()
 
     // create the titleblock
@@ -187,12 +189,12 @@ function createRenderBlock(renderPageName, titleblockUID){
     
 }
 
+
 function createCSSBlock(parentUID){
     // creates the initial code block and its parent
     // adding this to the roam/css page so users can use it as an example
     // if roam/css page doesn't exist then create it
     let pageUID = getPageUidByPageTitle('roam/css') || createPage('roam/css');
-    let blockUID = roamAlphaAPI.util.generateUID();
     // create closed parent block
     roamAlphaAPI
     .createBlock(
@@ -206,7 +208,7 @@ function createCSSBlock(parentUID){
             "heading":3}})
     
     // create codeblock for a todo progress bar
-    // I do this so that a user can see and modify the CSS
+    // I do this so that a user can see what to customize
     let css = `
 /* THIS CODEBLOCK IS OVERWRITTEN ON EVERY VERSION UPDATE
 DO NOT MODIFY*/
@@ -260,7 +262,7 @@ progress::-webkit-progress-value,
             {"parent-uid": parentUID, 
             "order": 0}, 
         "block": 
-            {"uid": blockUID,
+            {"uid": cssBlockUID,
             "string": blockString}})
 
 }
@@ -269,19 +271,38 @@ function replaceRenderString(){
     // replaces the {{[[roam/render]]:((5juEDRY_n))}} string across the entire graph
     // I do this because when the original block is deleted Roam leaves massive codeblocks wherever it was ref'd
     // also allows me to re-add back if a user uninstalls and then re-installs
+    let query = `[:find
+        (pull ?node [:block/string :node/title :block/uid])
+      :where
+        (or [?node :block/string ?node-String]
+      [?node :node/title ?node-String])
+        [(clojure.string/includes? ?node-String "{{[[roam/render]]:((roam-render-todo-progress-cljs))}}")]
+      ]`;
+    let renderString = `{{[[roam/render]]:((${codeBlockUID}))}}`
+    let result = window.roamAlphaAPI.q(query).flat();
+    result.forEach(block => {
+        const updatedString = block.string.replace(renderString, '{{todo-progress-bar}}');
+        window.roamAlphaAPI.updateBlock({
+          block: {
+            uid: block.uid,
+            string: updatedString
+          }
+        });
+    });
 }
 
 export default function toggleProgressBar(state) {
-    let titleblockUID = 'todo-progress';
+    let titleblockUID = 'roam-render-todo-progress';
     let renderPageName = 'roam/render'
     // css
-    let codeBlockParentUID = 'todo-progress-css-parent';
+    let cssBlockParentUID = 'todo-progress-css-parent';
 
     if (state==true) {
         createRenderBlock(renderPageName, titleblockUID)
-        createCSSBlock(codeBlockParentUID);
+        createCSSBlock(cssBlockParentUID);
     } else if(state==false){
+        replaceRenderString()
         removeCodeBlock(titleblockUID)
-        removeCodeBlock(codeBlockParentUID)
+        removeCodeBlock(cssBlockParentUID)
     }
 }
