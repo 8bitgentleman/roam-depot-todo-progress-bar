@@ -11,7 +11,7 @@ const cssBlockParentUID = 'todo-progress-css-parent';
 
 function onload({extensionAPI}) {
   const panelConfig = {
-    tabTitle: "TODO Progressbar",
+    tabTitle: "TODO Progress Bar",
     settings: [
         {id:		  "strikethrough",
           name:		"Strikethrough DONE tasks",
