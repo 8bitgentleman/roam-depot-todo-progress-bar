@@ -1,17 +1,17 @@
-import toggleProgressBar from "./entry-helpers";
+import toggleRenderComponent from "./entry-helpers";
 
-function findBlockByUID(uid){
-  return roamAlphaAPI.q(
-      `[:find (pull ?e [:block/uid]) :where [?e :block/uid "${uid}"]]`
-      )?.[0]?.[0].uid || null
-}
+const codeBlockUID = 'roam-render-todo-progress-cljs';
+const cssBlockUID = 'roam-render-todo-progress-css';
+const renderString = `{{[[roam/render]]:((${codeBlockUID}))}}`;
+const replacementString = '{{todo-progress-bar}}';
+const version = 'v11';
+const titleblockUID = 'roam-render-todo-progress';
+const cssBlockParentUID = 'todo-progress-css-parent';
 
-function onload({extensionAPI}) {
-  let titleblockUID = 'roam-render-todo-progress';
+function onload() {
   if (!roamAlphaAPI.data.pull("[*]", [":block/uid", titleblockUID])) {
     // component hasn't been loaded so we add it to the graph
-    toggleProgressBar(true)
-    // console.log(clsjFile)
+    toggleRenderComponent(true, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID)
   }
 
   console.log("load todo progress bar plugin");
@@ -19,7 +19,7 @@ function onload({extensionAPI}) {
 
 function onunload() {
   console.log("unload todo progress bar plugin");
-  toggleProgressBar(false)
+  toggleRenderComponent(false, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID)
 }
 
 export default {
