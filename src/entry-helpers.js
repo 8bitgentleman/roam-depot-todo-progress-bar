@@ -2,6 +2,8 @@ import cssFile from "./todo-progress-bar.css";
 import clsjFile from "./todo-progress-bar.cljs";
 const codeBlockUID = 'roam-render-todo-progress-cljs';
 const cssBlockUID = 'roam-render-todo-progress-css';
+const renderString = `{{[[roam/render]]:((${codeBlockUID}))}}`
+const replacementString = '{{todo-progress-bar}}'
 const version = 'v11'
 
 function removeCodeBlock(uid){
@@ -132,21 +134,23 @@ function createCSSBlock(parentUID){
 
 }
 
-function replaceRenderString(){
+function replaceRenderString(renderString, replacementString){
     // replaces the {{[[roam/render]]:((5juEDRY_n))}} string across the entire graph
     // I do this because when the original block is deleted Roam leaves massive codeblocks wherever it was ref'd
     // also allows me to re-add back if a user uninstalls and then re-installs
+    
+
     let query = `[:find
         (pull ?node [:block/string :node/title :block/uid])
       :where
         (or [?node :block/string ?node-String]
       [?node :node/title ?node-String])
-        [(clojure.string/includes? ?node-String "{{[[roam/render]]:((roam-render-todo-progress-cljs))}}")]
+        [(clojure.string/includes? ?node-String "${renderString}")]
       ]`;
-    let renderString = `{{[[roam/render]]:((${codeBlockUID}))}}`
+    
     let result = window.roamAlphaAPI.q(query).flat();
     result.forEach(block => {
-        const updatedString = block.string.replace(renderString, '{{todo-progress-bar}}');
+        const updatedString = block.string.replace(renderString, replacementString);
         window.roamAlphaAPI.updateBlock({
           block: {
             uid: block.uid,
@@ -165,8 +169,11 @@ export default function toggleProgressBar(state) {
     if (state==true) {
         createRenderBlock(renderPageName, titleblockUID)
         createCSSBlock(cssBlockParentUID);
+        // if there was a previous install re-add in the correct uid/renderString
+        replaceRenderString(replacementString, renderString)
     } else if(state==false){
-        replaceRenderString()
+        
+        replaceRenderString(renderString, replacementString)
         removeCodeBlock(titleblockUID)
         removeCodeBlock(cssBlockParentUID)
     }
