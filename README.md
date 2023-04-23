@@ -1,4 +1,4 @@
-Roam Research component for visually tracking TODOs in a list via a progress bar.
+Roam Research progress bar component for visually tracking TODOs in a list.
 
 ## Example 
 <img src="https://github.com/8bitgentleman/roam-depot-todo-progress-bar/raw/main/example.gif" max-width="400"></img>
