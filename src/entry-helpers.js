@@ -1,10 +1,5 @@
-import cssFile from "./todo-progress-bar.css";
-import clsjFile from "./todo-progress-bar.cljs";
-const codeBlockUID = 'roam-render-todo-progress-cljs';
-const cssBlockUID = 'roam-render-todo-progress-css';
-const renderString = `{{[[roam/render]]:((${codeBlockUID}))}}`
-const replacementString = '{{todo-progress-bar}}'
-const version = 'v11'
+import cssFile from "./component.css";
+import clsjFile from "./component.cljs";
 
 function removeCodeBlock(uid){
     roamAlphaAPI.deleteBlock({"block":{"uid": uid}})
@@ -33,7 +28,7 @@ function getPageUidByPageTitle(title){
         )?.[0]?.[0].uid || null
 }
 
-function createRenderBlock(renderPageName, titleblockUID){
+function createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID){
     let renderPageUID = getPageUidByPageTitle(renderPageName)|| createPage(renderPageName);
     let templateBlockUID = roamAlphaAPI.util.generateUID()
     let codeBlockHeaderUID = roamAlphaAPI.util.generateUID()
@@ -52,7 +47,7 @@ function createRenderBlock(renderPageName, titleblockUID){
             "open":true,
             "heading":3}})
     // create the template name block
-    // TODO Progress Bar v10 [[roam/templates]]
+    // TODO Progress Bar vXX [[roam/templates]]
     roamAlphaAPI
     .createBlock(
         {"location": 
@@ -101,7 +96,7 @@ function createRenderBlock(renderPageName, titleblockUID){
 }
 
 
-function createCSSBlock(parentUID){
+function createCSSBlock(parentUID, cssBlockUID){
     // creates the initial code block and its parent
     // adding this to the roam/css page so users can use it as an example
     // if roam/css page doesn't exist then create it
@@ -160,19 +155,13 @@ function replaceRenderString(renderString, replacementString){
     });
 }
 
-export default function toggleProgressBar(state) {
-    let titleblockUID = 'roam-render-todo-progress';
+export default function toggleRenderComponent(state, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID) {
     let renderPageName = 'roam/render'
-    // css
-    let cssBlockParentUID = 'todo-progress-css-parent';
-
     if (state==true) {
-        createRenderBlock(renderPageName, titleblockUID)
-        createCSSBlock(cssBlockParentUID);
-        // if there was a previous install re-add in the correct uid/renderString
-        replaceRenderString(replacementString, renderString)
+        createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID)
+        createCSSBlock(cssBlockParentUID, cssBlockUID);
+
     } else if(state==false){
-        
         replaceRenderString(renderString, replacementString)
         removeCodeBlock(titleblockUID)
         removeCodeBlock(cssBlockParentUID)
