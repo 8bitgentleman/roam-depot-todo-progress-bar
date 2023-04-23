@@ -1,5 +1,6 @@
-import cssFile from "./component.css";
+import componentCSSFile from "./component.css";
 import clsjFile from "./component.cljs";
+import strikethroughCSSFile from "./strikethrough.css";
 
 function removeCodeBlock(uid){
     roamAlphaAPI.deleteBlock({"block":{"uid": uid}})
@@ -96,27 +97,26 @@ function createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID)
 }
 
 
-function createCSSBlock(parentUID, cssBlockUID){
+function createCSSBlock(parentUID, cssBlockUID, cssFile, parentString){
     // creates the initial code block and its parent
     // adding this to the roam/css page so users can use it as an example
     // if roam/css page doesn't exist then create it
     let pageUID = getPageUidByPageTitle('roam/css') || createPage('roam/css');
     // create closed parent block
-    roamAlphaAPI
-    .createBlock(
+    roamAlphaAPI.createBlock(
         {"location": 
             {"parent-uid": pageUID, 
             "order": "last"}, 
         "block": 
-            {"string": `TODO PROGRESS BAR STYLE [[${uidForToday()}]]`,
+            {"string": `${parentString} [[${uidForToday()}]]`,
             "uid":parentUID,
             "open":false,
             "heading":3}})
-    
+
     // create codeblock for a todo progress bar
     // I do this so that a user can see what to customize
     let css = cssFile.toString();
-
+    
     let blockString = "```css\n " + css + " ```"
     roamAlphaAPI
     .createBlock(
@@ -155,11 +155,21 @@ function replaceRenderString(renderString, replacementString){
     });
 }
 
-export default function toggleRenderComponent(state, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID) {
+export function toggleStrikethroughCSS(state) {
+    let codeBlockParentUID = 'strikethrough-css-parent';
+    let codeBlockUID = 'strikethrough-css';
+    if (state==true) {
+        createCSSBlock(codeBlockParentUID, codeBlockUID, strikethroughCSSFile, 'DONE Task Strikethrough STYLE');
+    } else if(state==false){
+        removeCodeBlock(codeBlockParentUID)
+    }
+}
+
+export function toggleRenderComponent(state, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID) {
     let renderPageName = 'roam/render'
     if (state==true) {
         createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID)
-        createCSSBlock(cssBlockParentUID, cssBlockUID);
+        createCSSBlock(cssBlockParentUID, cssBlockUID, componentCSSFile, 'TODO PROGRESS BAR STYLE');
 
     } else if(state==false){
         replaceRenderString(renderString, replacementString)
