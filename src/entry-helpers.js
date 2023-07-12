@@ -29,7 +29,7 @@ function getPageUidByPageTitle(title){
         )?.[0]?.[0].uid || null
 }
 
-function createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID){
+function createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID, componentName){
     let renderPageUID = getPageUidByPageTitle(renderPageName)|| createPage(renderPageName);
     let templateBlockUID = roamAlphaAPI.util.generateUID()
     let codeBlockHeaderUID = roamAlphaAPI.util.generateUID()
@@ -43,7 +43,7 @@ function createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID)
             {"parent-uid": renderPageUID, 
             "order": 0}, 
         "block": 
-            {"string": `TODO Progress Bar [[${uidForToday()}]]`,
+            {"string": `${componentName} [[${uidForToday()}]]`,
             "uid":titleblockUID,
             "open":true,
             "heading":3}})
@@ -55,7 +55,7 @@ function createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID)
             {"parent-uid": titleblockUID, 
             "order": 0}, 
         "block": 
-            {"string": `TODO Progress Bar ${version} [[roam/templates]]`,
+            {"string": `${componentName} ${version} [[roam/templates]]`,
             "uid":templateBlockUID,
             "open":true}})
     // create the render component block
@@ -165,11 +165,11 @@ export function toggleStrikethroughCSS(state) {
     }
 }
 
-export function toggleRenderComponent(state, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID) {
+export function toggleRenderComponent(state, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID, componentName) {
     let renderPageName = 'roam/render'
     if (state==true) {
-        createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID)
-        createCSSBlock(cssBlockParentUID, cssBlockUID, componentCSSFile, 'TODO PROGRESS BAR STYLE');
+        createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID, componentName)
+        createCSSBlock(cssBlockParentUID, cssBlockUID, componentCSSFile, `${componentName} STYLE`);
 
     } else if(state==false){
         replaceRenderString(renderString, replacementString)
