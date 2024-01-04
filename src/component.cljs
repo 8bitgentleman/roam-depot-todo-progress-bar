@@ -58,48 +58,37 @@
        (map  info-from-id)
        (flatten)))
 
-
 (defn main [{:keys [block-uid]} & args]
   (let [pages-referenced (recurse-search block-uid)
-      todo-count (count-occurrences "TODO" pages-referenced)
-      doing-count (count-occurrences "DOING" pages-referenced)
-      done-count (count-occurrences "DONE" pages-referenced)
-      blocked-count (count-occurrences "BLOCKED" pages-referenced)
-      canceled-count (count-occurrences "CANCELED" pages-referenced)
-      tasks (r/atom {
-          :todo todo-count
-          :done done-count
-          :doing doing-count
-          :blocked blocked-count
-          :canceled canceled-count})]
-      (println tasks)
-      ;(println (count-occurrences "TODO" (recurse-search block-uid)))
+        tasks (r/atom {:todo (count-occurrences "TODO" pages-referenced)
+                       :doing (count-occurrences "DOING" pages-referenced)
+                       :done (count-occurrences "DONE" pages-referenced)
+                       :blocked (count-occurrences "BLOCKED" pages-referenced)
+                       :canceled (count-occurrences "CANCELED" pages-referenced)})]
+    (let [done-tasks (:done @tasks)
+          todo-tasks (:todo @tasks)
+          doing-tasks (:doing @tasks)
+          blocked-tasks (:blocked @tasks)
+          max-value (apply max (map @tasks [:done :todo :doing :blocked]))
+          done-percentage (* 100 (/ done-tasks max-value))
+          todo-percentage (* 100 (/ todo-tasks max-value))
+          doing-percentage (* 100 (/ doing-tasks max-value))
+          blocked-percentage (* 100 (/ blocked-tasks max-value))]
       [:div
-             [:div {:style {:display "flex"
-                                 :align-items "center"}
-                         }
-                   [:span [:progress {
-                      :id "file"
-                      :name "percent-done"
-                      :value (:done @tasks)
-                      :max (+ (:todo @tasks) (:done @tasks) (:blocked @tasks) (:doing @tasks))
-                      :style{
-
-                             :margin-left "10px"
-                             :margin-right "10px"
-                             }}]
-                    ]
-              
-                    [:span [:div  (str (:done @tasks)  "/"
-                                      (+ 
-                                        (:done @tasks)
-                                        (:todo @tasks)
-                                        (:doing @tasks)
-                                        (:blocked @tasks)
-                                        )
-                                    " Done"
-                                    )]]
-
-                   ]
-           ]
-  )) 
+       [:div {:style {:display "flex"
+                      :align-items "center"}}
+        [:div {:style {:width "140px" :height "6px" :background-color "#ddd" :display "flex" :border-radius "3px" :overflow "hidden" :margin-left "10px" :margin-right "10px"}}
+         [:div.done {:style {:width (str (* done-percentage 1.4) "px") :height "6px" :background-color "#137CBD"}}]
+         [:div.blocked {:style {:width (str (* blocked-percentage 1.4) "px") :height "6px" :background-color "#db3737"}}]
+         [:div.doing {:style {:width (str (* doing-percentage 1.4) "px") :height "6px" :background-color "#009E23"}}]
+         [:div.todo {:style {:width (str (* todo-percentage 1.4) "px") :height "6px" :background-color "#ddd" :border-radius "0px 3px 3px 0px"}}]
+        ]
+        [:span [:div  (str done-tasks  "/"
+                           (+ done-tasks
+                              todo-tasks
+                              doing-tasks
+                              blocked-tasks)
+                           " Done"
+                           )]]
+       ]
+      ])))
