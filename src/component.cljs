@@ -42,13 +42,9 @@
       )
   )
 
-(defn count-occurrences 
-  "Counts the occurances of a string in a list"
-  [s slist]
-  (->> slist
-       flatten
-       (filter #{s})
-       count))
+(defn count-occurrences [task tasks]
+   "Counts the occurances of a string in a list"
+  (count (filter #(= task %) tasks)))
 
 
 (defn recurse-search
@@ -64,10 +60,20 @@
 
 
 (defn main [{:keys [block-uid]} & args]
-  (let [tasks (r/atom {;; don't love that I do this search twice
-                       :todo (count-occurrences "TODO" (recurse-search block-uid))
-                       :done (count-occurrences "DONE" (recurse-search block-uid))} )]
-    
+  (let [pages-referenced (recurse-search block-uid)
+      todo-count (count-occurrences "TODO" pages-referenced)
+      doing-count (count-occurrences "DOING" pages-referenced)
+      done-count (count-occurrences "DONE" pages-referenced)
+      blocked-count (count-occurrences "BLOCKED" pages-referenced)
+      canceled-count (count-occurrences "CANCELED" pages-referenced)
+      tasks (r/atom {
+          :todo todo-count
+          :done done-count
+          :doing doing-count
+          :blocked blocked-count
+          :canceled canceled-count})]
+      (println tasks)
+      ;(println (count-occurrences "TODO" (recurse-search block-uid)))
       [:div
              [:div {:style {:display "flex"
                                  :align-items "center"}
@@ -76,20 +82,24 @@
                       :id "file"
                       :name "percent-done"
                       :value (:done @tasks)
-                      :max (+ (:todo @tasks) (:done @tasks))
+                      :max (+ (:todo @tasks) (:done @tasks) (:blocked @tasks) (:doing @tasks))
                       :style{
 
                              :margin-left "10px"
                              :margin-right "10px"
                              }}]
                     ]
+              
                     [:span [:div  (str (:done @tasks)  "/"
                                       (+ 
                                         (:done @tasks)
-                                        (:todo @tasks))
+                                        (:todo @tasks)
+                                        (:doing @tasks)
+                                        (:blocked @tasks)
+                                        )
                                     " Done"
                                     )]]
 
                    ]
            ]
-  ))
+  )) 
