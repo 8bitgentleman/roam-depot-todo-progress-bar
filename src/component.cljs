@@ -107,6 +107,6 @@
         tasks (r/atom {:todo (count-occurrences "TODO" (recurse-search block-uid))
                       :done (count-occurrences "DONE" (recurse-search block-uid))})
         total (+ (:todo @tasks) (:done @tasks))]
-    (if (= style "circle")
+    (if (= style "radial")
       [circle-progress-bar (:done @tasks) total]
       [horizontal-progress-bar (:done @tasks) total])))
