@@ -1,42 +1,57 @@
-:root{
-  --progress-bar-default:#137cbd;
-  --progress-bar:#137cbd;
-  --progress-border:#B6B6B6;
-  --progress-bg:#dfe2e5;
+:root {
+  --progress-bar-default: #137cbd;
+  --progress-bar: #137cbd;
+  --progress-border: #B6B6B6;
+  --progress-bg: #dfe2e5;
+  --circle-bg: #e6e6e6;
+  --circle-fill: #3b82f6;
 }
+
 :root .rm-dark-theme {
-  --progress-border:#137cbd;
-  --progress-bg:#EFEFEF;
+  --progress-border: #137cbd;
+  --progress-bg: #EFEFEF;
+  --circle-bg: #4b5563;
+  --circle-fill: #137cbd;
 }
-/* THIS CODEBLOCK IS OVERWRITTEN ON EVERY VERSION UPDATE
-DO NOT MODIFY*/
+
+/* Linear progress bar styles */
 progress[name="percent-done"],
-.todo-progress-bar progress{
-  display:inline-block;
-  height:6px;
-  background:none;
+.todo-progress-bar progress {
+  display: inline-block;
+  height: 6px;
+  background: none;
   border-radius: 15px;
-  margin-bottom:2px;
+  margin-bottom: 2px;
 }
   
 progress::-webkit-progress-bar,
-.todo-progress-bar progress::-webkit-progress-bar{
-  height:6px;
+.todo-progress-bar progress::-webkit-progress-bar {
+  height: 6px;
   background-color: var(--progress-bg);
   border-radius: 15px;
 }
 
 .rm-dark-theme progress::-webkit-progress-bar,
-.rm-dark-theme .todo-progress-bar progress::-webkit-progress-bar{
-box-shadow:0px 0px 6px var(--progress-border) inset;
+.rm-dark-theme .todo-progress-bar progress::-webkit-progress-bar {
+  box-shadow: 0px 0px 6px var(--progress-border) inset;
 }
 
 progress::-webkit-progress-value,
-.todo-progress-bar progress::-webkit-progress-value{
-  display:inline-block;
-  float:left;
-  height:6px;
-  margin:0px -10px 0 0;
+.todo-progress-bar progress::-webkit-progress-value {
+  display: inline-block;
+  float: left;
+  height: 6px;
+  margin: 0px -10px 0 0;
   background: var(--progress-bar);
   border-radius: 5px;
+}
+
+/* Circle progress bar styles */
+.progress-circle circle {
+  fill: var(--circle-bg);
+  stroke: var(--circle-bg);
+}
+
+.progress-circle path {
+  fill: var(--circle-fill);
 }
