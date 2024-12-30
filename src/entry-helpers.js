@@ -29,104 +29,129 @@ function getPageUidByPageTitle(title){
         )?.[0]?.[0].uid || null
 }
 
-function createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID, componentName){
-    let renderPageUID = getPageUidByPageTitle(renderPageName)|| createPage(renderPageName);
-    let templateBlockUID = roamAlphaAPI.util.generateUID()
-    let codeBlockHeaderUID = roamAlphaAPI.util.generateUID()
-    let renderBlockUID = roamAlphaAPI.util.generateUID()
+async function createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID, componentName) {
+    console.log('Creating blocks with UIDs:', {
+        titleblockUID,
+        codeBlockUID,
+        renderPageName
+    });
 
-    // create the titleblock
-    //TODO Progress Bar [[January 12th, 2023]]
-    roamAlphaAPI
-    .createBlock(
-        {"location": 
-            {"parent-uid": renderPageUID, 
-            "order": 0}, 
-        "block": 
-            {"string": `${componentName} [[${uidForToday()}]]`,
-            "uid":titleblockUID,
-            "open":true,
-            "heading":3}})
-    // create the template name block
-    // TODO Progress Bar vXX [[roam/templates]]
-    roamAlphaAPI
-    .createBlock(
-        {"location": 
-            {"parent-uid": titleblockUID, 
-            "order": 0}, 
-        "block": 
-            {"string": `${componentName} ${version} [[roam/templates]]`,
-            "uid":templateBlockUID,
-            "open":true}})
-    // create the render component block
-    // {{roam/render:((diA0Fyj5m))}}
-    roamAlphaAPI
-    .createBlock(
-        {"location": 
-            {"parent-uid": templateBlockUID, 
-            "order": 0}, 
-        "block": 
-            {"string": `{{[[roam/render]]:((${codeBlockUID}))}}`,
-            "uid":renderBlockUID}})
+    const renderPageUID = getPageUidByPageTitle(renderPageName) || await createPage(renderPageName);
+    console.log('Render page UID:', renderPageUID);
 
-    // create code header block
-    roamAlphaAPI
-    .createBlock(
-        {"location": 
-            {"parent-uid": titleblockUID, 
-            "order": 'last'}, 
-        "block": 
-            {"string": `code`,
-            "uid":codeBlockHeaderUID,
-            "open":false}})
+    const templateBlockUID = roamAlphaAPI.util.generateUID();
+    const codeBlockHeaderUID = roamAlphaAPI.util.generateUID();
+    const renderBlockUID = roamAlphaAPI.util.generateUID();
 
-            // create codeblock for the component
+    // Create blocks sequentially with await
+    try {
+        await new Promise(resolve => setTimeout(resolve, 500)); // Add delay before first block
+        await window.roamAlphaAPI.createBlock({
+            location: {
+                "parent-uid": renderPageUID,
+                order: 0
+            },
+            block: {
+                string: `${componentName} [[${uidForToday()}]]`,
+                uid: titleblockUID,
+                open: true,
+                heading: 3
+            }
+        });
 
-    let cljs = clsjFile
-                
-    let blockString = "```clojure\n " + cljs + " ```"
-    roamAlphaAPI
-    .createBlock(
-        {"location": 
-            {"parent-uid": codeBlockHeaderUID, 
-            "order": 0}, 
-        "block": 
-            {"uid": codeBlockUID,
-            "string": blockString}})
-    
+        // Wait for title block to exist before creating children
+        await window.roamAlphaAPI.createBlock({
+            location: {
+                "parent-uid": titleblockUID,
+                order: 0
+            },
+            block: {
+                string: `${componentName} ${version} [[roam/templates]]`,
+                uid: templateBlockUID,
+                open: true
+            }
+        });
+
+        await window.roamAlphaAPI.createBlock({
+            location: {
+                "parent-uid": templateBlockUID,
+                order: 0
+            },
+            block: {
+                string: `{{[[roam/render]]:((${codeBlockUID}))}}`,
+                uid: renderBlockUID
+            }
+        });
+
+        await window.roamAlphaAPI.createBlock({
+            location: {
+                "parent-uid": titleblockUID,
+                order: 'last'
+            },
+            block: {
+                string: 'code',
+                uid: codeBlockHeaderUID,
+                open: false
+            }
+        });
+
+        const cljs = clsjFile;
+        const blockString = "```clojure\n " + cljs + " ```";
+        
+        await window.roamAlphaAPI.createBlock({
+            location: {
+                "parent-uid": codeBlockHeaderUID,
+                order: 0
+            },
+            block: {
+                uid: codeBlockUID,
+                string: blockString
+            }
+        });
+
+    } catch (error) {
+        console.error('Error creating blocks:', error);
+        throw error;
+    }
 }
 
 
-function createCSSBlock(parentUID, cssBlockUID, cssFile, parentString){
-    // creates the initial code block and its parent
-    // adding this to the roam/css page so users can use it as an example
-    // if roam/css page doesn't exist then create it
-    let pageUID = getPageUidByPageTitle('roam/css') || createPage('roam/css');
-    // create closed parent block
-    roamAlphaAPI.createBlock(
-        {"location": 
-            {"parent-uid": pageUID, 
-            "order": "last"}, 
-        "block": 
-            {"string": `${parentString} [[${uidForToday()}]]`,
-            "uid":parentUID,
-            "open":false,
-            "heading":3}})
-
-    // create codeblock for a todo progress bar
-    // I do this so that a user can see what to customize
-    let css = cssFile.toString();
+async function createCSSBlock(parentUID, cssBlockUID, cssFile, parentString) {
+    const pageUID = getPageUidByPageTitle('roam/css') || createPage('roam/css');
     
-    let blockString = "```css\n " + css + " ```"
-    roamAlphaAPI
-    .createBlock(
-        {"location": 
-            {"parent-uid": parentUID, 
-            "order": 0}, 
-        "block": 
-            {"uid": cssBlockUID,
-            "string": blockString}})
+    try {
+        // Create parent block
+        await roamAlphaAPI.createBlock({
+            location: {
+                "parent-uid": pageUID,
+                order: "last"
+            },
+            block: {
+                string: `${parentString} [[${uidForToday()}]]`,
+                uid: parentUID,
+                open: false,
+                heading: 3
+            }
+        });
 
+        // Create CSS codeblock
+        const css = cssFile.toString();
+        const blockString = "```css\n " + css + " ```";
+        
+        await roamAlphaAPI.createBlock({
+            location: {
+                "parent-uid": parentUID,
+                order: 0
+            },
+            block: {
+                uid: cssBlockUID,
+                string: blockString
+            }
+        });
+    } catch (error) {
+        console.error('Error creating CSS blocks:', error);
+        throw error;
+    }
 }
 
 function replaceRenderString(renderString, replacementString){
@@ -155,25 +180,24 @@ function replaceRenderString(renderString, replacementString){
     });
 }
 
-export function toggleStrikethroughCSS(state) {
-    let codeBlockParentUID = 'strikethrough-css-parent';
-    let codeBlockUID = 'strikethrough-css';
-    if (state==true) {
-        createCSSBlock(codeBlockParentUID, codeBlockUID, strikethroughCSSFile, 'DONE Task Strikethrough STYLE');
-    } else if(state==false){
-        removeCodeBlock(codeBlockParentUID)
+export async function toggleStrikethroughCSS(state) {
+    const codeBlockParentUID = 'strikethrough-css-parent';
+    const codeBlockUID = 'strikethrough-css';
+    if (state === true) {
+        await createCSSBlock(codeBlockParentUID, codeBlockUID, strikethroughCSSFile, 'DONE Task Strikethrough STYLE');
+    } else if (state === false) {
+        removeCodeBlock(codeBlockParentUID);
     }
 }
 
-export function toggleRenderComponent(state, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID, componentName) {
-    let renderPageName = 'roam/render'
-    if (state==true) {
-        createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID, componentName)
-        createCSSBlock(cssBlockParentUID, cssBlockUID, componentCSSFile, `${componentName} STYLE`);
-
-    } else if(state==false){
-        replaceRenderString(renderString, replacementString)
-        removeCodeBlock(titleblockUID)
-        removeCodeBlock(cssBlockParentUID)
+export async function toggleRenderComponent(state, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID, componentName) {
+    const renderPageName = 'roam/render';
+    if (state === true) {
+        await createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID, componentName);
+        await createCSSBlock(cssBlockParentUID, cssBlockUID, componentCSSFile, `${componentName} STYLE`);
+    } else if (state === false) {
+        replaceRenderString(renderString, replacementString);
+        removeCodeBlock(titleblockUID);
+        removeCodeBlock(cssBlockParentUID);
     }
 }
