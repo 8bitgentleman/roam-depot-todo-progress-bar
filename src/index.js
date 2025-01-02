@@ -6,12 +6,12 @@ const componentName = 'TODO Progress Bar';
 const version = 'v12';
 
 const componentLowerName = componentName.replaceAll(" ", "-").toLowerCase();
-const codeBlockUID = `roam-render-${componentLowerName}-cljs`;
-const cssBlockUID = `roam-render-${componentLowerName}-css`;
+const codeBlockUID = 'roam-render-todo-progress-cljs';
+const cssBlockUID = 'roam-render-todo-progress-css';
 const renderString = `{{[[roam/render]]:((${codeBlockUID}))}}`;
-const replacementString = `{{${componentLowerName}}}`;
-const titleblockUID = `roam-render-${componentLowerName}`;
-const cssBlockParentUID = `${componentLowerName}-css-parent`;
+const replacementString = '{{todo-progress-bar}}';
+const titleblockUID = 'roam-render-todo-progress';
+const cssBlockParentUID = 'todo-progress-css-parent';
 
 async function onload({extensionAPI}) {
   const panelConfig = {
