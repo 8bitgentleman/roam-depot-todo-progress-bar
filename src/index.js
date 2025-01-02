@@ -32,6 +32,8 @@ async function onload({extensionAPI}) {
 
   extensionAPI.settings.panel.create(panelConfig);
 
+  window.todoProgressBarExtensionData = {running: true};
+  
   try {
       if (!roamAlphaAPI.data.pull("[*]", [":block/uid", titleblockUID])) {
           await toggleRenderComponent(true, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID, componentName);
@@ -43,8 +45,9 @@ async function onload({extensionAPI}) {
 }
 
 function onunload() {
-  console.log(`unload ${componentName} plugin`)
+  window.todoProgressBarExtensionData = null;
   toggleRenderComponent(false, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID, componentName)
+  console.log(`unload ${componentName} plugin`)
 }
 
 export default {

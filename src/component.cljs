@@ -103,10 +103,23 @@
       (str done "/" total " Done - " (int percentage) "%")]]))
 
 (defn main [{:keys [block-uid]} & args]
-  (let [style (or (first args) "horizontal")
-        tasks (r/atom {:todo (count-occurrences "TODO" (recurse-search block-uid))
-                      :done (count-occurrences "DONE" (recurse-search block-uid))})
-        total (+ (:todo @tasks) (:done @tasks))]
-    (if (= style "radial")
-      [circle-progress-bar (:done @tasks) total]
-      [horizontal-progress-bar (:done @tasks) total])))
+  (r/with-let [is-running? #(try
+                             (.-running js/window.todoProgressBarExtensionData)
+                             (catch :default _e
+                               false))
+               *running? (r/atom (or (is-running?) nil))
+               check-interval (js/setInterval #(reset! *running? (is-running?)) 5000)]
+    (case @*running?
+      nil [:div [:strong "Loading progress bar extension..."]]
+      false [:div [:strong {:style {:color "red"}} 
+                   "Extension not installed. Please install Todo Progress Bar from Roam Depot."]]
+      ; If running is true, then we do your existing logic:
+      (let [style (or (first args) "horizontal")
+            tasks (r/atom {:todo (count-occurrences "TODO" (recurse-search block-uid))
+                          :done (count-occurrences "DONE" (recurse-search block-uid))})
+            total (+ (:todo @tasks) (:done @tasks))]
+        (if (= style "radial")
+          [circle-progress-bar (:done @tasks) total]
+          [horizontal-progress-bar (:done @tasks) total])))
+    (finally
+      (js/clearInterval check-interval))))

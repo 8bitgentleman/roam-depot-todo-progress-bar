@@ -196,8 +196,9 @@ export async function toggleRenderComponent(state, titleblockUID, cssBlockParent
         await createRenderBlock(renderPageName, titleblockUID, version, codeBlockUID, componentName);
         await createCSSBlock(cssBlockParentUID, cssBlockUID, componentCSSFile, `${componentName} STYLE`);
     } else if (state === false) {
-        replaceRenderString(renderString, replacementString);
-        removeCodeBlock(titleblockUID);
-        removeCodeBlock(cssBlockParentUID);
+        // TODO: since we're not doing anything on state=false maybe call this fn onLoadHelper?
+        // replaceRenderString(renderString, replacementString);
+        // removeCodeBlock(titleblockUID);
+        // removeCodeBlock(cssBlockParentUID);
     }
 }
