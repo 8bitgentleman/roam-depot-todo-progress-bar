@@ -4,6 +4,9 @@
    [datascript.core :as d]
    [roam.datascript.reactive :as dr]))
 
+; THIS CODEBLOCK IS OVERWRITTEN ON EVERY VERSION UPDATE
+; DO NOT MODIFY
+
 ;; Circle configuration
 (def base-size 11)
 (def radius (* 0.75 base-size))
