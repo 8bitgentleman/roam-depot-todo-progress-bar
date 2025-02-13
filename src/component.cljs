@@ -1,4 +1,4 @@
-(ns progress-bar-v13
+(ns progress-bar-v14
   (:require
    [reagent.core :as r]
    [datascript.core :as d]
@@ -68,20 +68,24 @@
        (map info-from-id)
        (flatten)))
 
-(defn horizontal-progress-bar [done total]
-  [:div {:style {:display "flex"
-                 :align-items "center"}}
-   [:span 
+(defn horizontal-progress-bar [done total status-text]
+     [:div {:style {:display "flex"
+                 :align-items "center"
+                 :flex-wrap "wrap"
+                 :gap "8px"}}
+   [:div {:style {:flex "1 1 150px"
+                  :min-width "150px"
+                  :max-width "300px"}}
     [:progress {:id "file"
                 :name "percent-done"
                 :value done
                 :max total
-                :style {:margin-left "10px"
-                        :margin-right "10px"}}]]
-   [:span 
-    [:div (str done "/" total " Done")]]])
+                :style {:width "100%"}}]]
+   [:div {:style {:flex "0 1 auto"
+                  :white-space "nowrap"}}
+    (str done "/" total " " status-text)]])
 
-(defn circle-progress-bar [done total]
+(defn circle-progress-bar [done total status-text]
   (let [percentage (if (zero? total)
                     0
                     (* (/ done total) 100))]
@@ -103,7 +107,7 @@
          :fill "var(--circle-fill)"
          :stroke "none"}]]]
      [:span.text-base
-      (str done "/" total " Done - " (int percentage) "%")]]))
+      (str done "/" total " " status-text " - " (int percentage) "%")]]))
 
 (defn main [{:keys [block-uid]} & args]
   (r/with-let [is-running? #(try
@@ -117,12 +121,13 @@
       false [:div [:strong {:style {:color "red"}} 
                    "Extension not installed. Please install Todo Progress Bar from Roam Depot."]]
       ; If running is true, then we do your existing logic:
-      (let [style (or (first args) "horizontal")
+      (let [style (first args)
+            status-text (or (second args) "Done") ; Default to "Done" if not provided
             tasks (r/atom {:todo (count-occurrences "TODO" (recurse-search block-uid))
                           :done (count-occurrences "DONE" (recurse-search block-uid))})
             total (+ (:todo @tasks) (:done @tasks))]
         (if (= style "radial")
-          [circle-progress-bar (:done @tasks) total]
-          [horizontal-progress-bar (:done @tasks) total])))
+          [circle-progress-bar (:done @tasks) total status-text]
+          [horizontal-progress-bar (:done @tasks) total status-text])))
     (finally
       (js/clearInterval check-interval))))

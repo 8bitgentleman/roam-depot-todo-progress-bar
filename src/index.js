@@ -3,7 +3,7 @@ import { toggleStrikethroughCSS } from "./entry-helpers";
 //setting this up to be as generic as possible
 //should mostly need to edit the top variables when creating a new extension/version
 const componentName = 'TODO Progress Bar';
-const version = 'v13';
+const version = 'v14';
 
 const componentLowerName = componentName.replaceAll(" ", "-").toLowerCase();
 const codeBlockUID = 'roam-render-todo-progress-cljs';
