@@ -14,4 +14,8 @@ Easiest way to insert the component is though Roam's native template menu. Simpl
 <img src="https://github.com/8bitgentleman/roam-depot-todo-progress-bar/raw/main/template.png" max-width="400"></img>
 
 ## Customization
+### Visualization 
 The TODO progress bar now comes with a circle option. To use it just pass "radial" into the component like this `{{[[roam/render]]:((roam-render-todo-progress-cljs))  "radial"}}`
+
+### Label
+You are now able to customize the TODO progress bar text label. To pass in your own text to the component you can do this `{{[[roam/render]]:((roam-render-todo-progress-cljs))  "horizontal" "Your Text Here"}}`
