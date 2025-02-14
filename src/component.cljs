@@ -69,13 +69,14 @@
        (flatten)))
 
 (defn horizontal-progress-bar [done total status-text]
-     [:div {:style {:display "flex"
+  [:div {:style {:display "flex"
                  :align-items "center"
                  :flex-wrap "wrap"
-                 :gap "8px"}}
+                 :gap "8px"
+                 :margin-left "8px"}}
    [:div {:style {:flex "1 1 150px"
                   :min-width "150px"
-                  :max-width "300px"}}
+                  :max-width "150px"}} 
     [:progress {:id "file"
                 :name "percent-done"
                 :value done
