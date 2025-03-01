@@ -190,6 +190,46 @@ export async function toggleStrikethroughCSS(state) {
     }
 }
 
+export async function updateCodeBlock(codeBlockUID) {
+    try {
+        const cljs = clsjFile;
+        const blockString = "```clojure\n " + cljs + " ```";
+        
+        // Update the existing block with new content
+        await roamAlphaAPI.updateBlock({
+            block: {
+                uid: codeBlockUID,
+                string: blockString
+            }
+        });
+        console.log("Successfully updated code block content");
+        return true;
+    } catch (error) {
+        console.error("Error updating code block:", error);
+        return false;
+    }
+}
+
+export async function updateCSSBlock(cssBlockUID) {
+    try {
+        const css = componentCSSFile.toString();
+        const blockString = "```css\n " + css + " ```";
+        
+        // Update the existing block with new content
+        await roamAlphaAPI.updateBlock({
+            block: {
+                uid: cssBlockUID,
+                string: blockString
+            }
+        });
+        console.log("Successfully updated CSS block content");
+        return true;
+    } catch (error) {
+        console.error("Error updating CSS block:", error);
+        return false;
+    }
+}
+
 export async function toggleRenderComponent(state, titleblockUID, cssBlockParentUID, version, renderString, replacementString, cssBlockUID, codeBlockUID, componentName) {
     const renderPageName = 'roam/render';
     if (state === true) {
