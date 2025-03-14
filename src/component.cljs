@@ -1,12 +1,10 @@
-(ns progress-bar-v15
+(ns progress-bar-v16
   (:require
    [reagent.core :as r]
    [datascript.core :as d]
    [roam.datascript.reactive :as dr]
    [roam.block :as block]
    [blueprintjs.core :as bp-core]))
-
-; Base v14 code with incremental changes for v15 features
 
 ;; Circle configuration
 (def base-size 11)
@@ -31,20 +29,13 @@
       (str "M " center-point "," start-y " A " radius "," radius " 0 " large-arc ",1 "
            x "," y " L " center-point "," center-point " Z"))))
 
-;; Helper functions
+;; Helper functions - OPTIMIZED WITH PULL QUERIES
 (defn flatten-block [acc block]
   (reduce flatten-block
           (conj acc (dissoc block :block/children))
           (:block/children block)))
 
-(defn find-child-refs [block-uid]
-  (flatten-block []
-                 @(dr/q '[:find (pull ?e [:block/refs {:block/children ...}]) .
-                          :in $ ?uid
-                          :where
-                          [?e :block/uid ?uid]]
-                        block-uid)))
-
+;; Using pull for page title lookup
 (defn id-title [id]
   (:node/title @(dr/pull '[:node/title] id)))
 
@@ -60,16 +51,7 @@
        (filter #{s})
        count))
 
-(defn recurse-search [block-uid]
-  (->> block-uid
-       (find-child-refs)
-       (map :block/refs)
-       (flatten)
-       (map :db/id)
-       (map info-from-id)
-       (flatten)))
-
-;; NEW: Embed detection and processing (extension to original functions)
+;; Embed detection and processing
 (defn contains-embed? [block-string]
   (let [result (and block-string
                     (or (clojure.string/includes? block-string "{{embed:")
@@ -90,8 +72,6 @@
       ;; Extract just the UID from each match (second item in match array)
       (mapv second all-matches))))
 
-;; NEW: Enhanced search with embed support
-;; Process block with embeds
 (defn process-block-with-embeds
   ([block] (process-block-with-embeds block #{}))
   ([block visited-uids]
@@ -112,23 +92,16 @@
       (when (seq embed-uids)
         (mapcat (fn [uid]
                   (when-let [embedded-block
-                             @(dr/q '[:find (pull ?e [:block/uid :block/string :block/refs
-                                                      {:block/children ...}]) .
-                                      :in $ ?uid
-                                      :where
-                                      [?e :block/uid ?uid]]
-                                    uid)]
+                             @(dr/pull '[:block/uid :block/string :block/refs {:block/children ...}]
+                                      [:block/uid uid])]
                     ;; Only process if not already visited (prevent cycles)
                     (when-not (contains? updated-visited uid)
                       (process-block-with-embeds embedded-block updated-visited))))
                 embed-uids))))))
 
 (defn find-child-refs-with-embeds [block-uid]
-  (let [block @(dr/q '[:find (pull ?e [:block/uid :block/string :block/refs {:block/children ...}]) .
-                       :in $ ?uid
-                       :where
-                       [?e :block/uid ?uid]]
-                     block-uid)]
+  (let [block @(dr/pull '[:block/uid :block/string :block/refs {:block/children ...}] 
+                        [:block/uid block-uid])]
     (process-block-with-embeds block)))
 
 (defn recurse-search-with-embeds [block-uid]
@@ -136,11 +109,26 @@
        (find-child-refs-with-embeds)
        (keep :block/refs)
        (flatten)
-       (keep :db/id)
+       (map :db/id)
        (map info-from-id)
        (flatten)))
 
-;; NEW: BlueprintJS component adaptations
+;; Legacy function kept for backward compatibility
+(defn find-child-refs [block-uid]
+  (flatten-block []
+                 @(dr/pull '[:block/refs {:block/children ...}]
+                          [:block/uid block-uid])))
+
+(defn recurse-search [block-uid]
+  (->> block-uid
+       (find-child-refs)
+       (keep :block/refs)
+       (flatten)
+       (map :db/id)
+       (map info-from-id)
+       (flatten)))
+
+;; BlueprintJS component adaptations
 (def bp-button (r/adapt-react-class bp-core/Button))
 (def bp-popover (r/adapt-react-class bp-core/Popover))
 (def bp-menu (r/adapt-react-class bp-core/Menu))
@@ -149,7 +137,7 @@
 (def bp-input (r/adapt-react-class bp-core/InputGroup))
 (def bp-switch (r/adapt-react-class bp-core/Switch))
 
-;; NEW: Component configuration management
+;; Component configuration management
 (defn get-component-code-uid [block-string]
   (when block-string
     (let [pattern #"\{\{(?:\[\[)?roam/render(?:\]\])?: *\(\(([^)]+)\)\).*\}\}"
@@ -168,11 +156,7 @@
     current-string))
 
 (defn update-block-string [block-uid style status-text include-embeds]
-  (let [current-block @(dr/q '[:find (pull ?e [:block/string]) .
-                              :in $ ?uid
-                              :where
-                              [?e :block/uid ?uid]]
-                            block-uid)
+  (let [current-block @(dr/pull '[:block/string] [:block/uid block-uid])
         current-string (:block/string current-block)
         new-string (format-render-string current-string style status-text include-embeds)]
     (when (not= current-string new-string)
@@ -180,7 +164,7 @@
         {:block {:uid block-uid
                  :string new-string}}))))
 
-;; NEW: Settings menu
+;; Settings menu
 (defn settings-menu [block-uid current-style current-status-text current-include-embeds on-close]
   (let [*style (r/atom current-style)
         *status-text (r/atom current-status-text)
