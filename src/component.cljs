@@ -221,45 +221,47 @@
                        (.preventDefault e)
                        (update-block-string block-uid @*style @*status-text @*include-embeds)
                        (on-close))}
- "Apply"]
-         "Apply"]]])))
+          "Apply"]
+         ]])))
 
 (defn horizontal-progress-bar [block-uid done total status-text on-settings-click]
   (r/with-let [*hovered? (r/atom false)]
     [:span {:style {:display "inline-flex"
-                    :align-items "center"
-                    :gap "8px"
-                    :vertical-align "middle"}
-            :on-mouse-enter #(reset! *hovered? true)
-            :on-mouse-leave #(reset! *hovered? false)}
+                   :align-items "center"
+                   :gap "8px"
+                   :vertical-align "middle"}
+           :on-mouse-enter #(reset! *hovered? true)
+           :on-mouse-leave #(reset! *hovered? false)}
      [:span {:style {:display "inline-block"
-                     :width "150px"}}
+                    :width "150px"}} 
       [:progress {:id "file"
                   :name "percent-done"
                   :value done
                   :max total
                   :style {:width "100%"}}]]
      [:span {:style {:white-space "nowrap"
-                     :display "inline-flex"
-                     :align-items "center"
-                     :gap "8px"}}
+                    :display "inline-flex"
+                    :align-items "center"}}
       [:span (str done "/" total " " status-text)]
-      [:span {:style {:opacity (if @*hovered? "1" "0")
-                      :transition "opacity 0.2s ease-in-out"}}
+      [:span {:style {:width (if @*hovered? "auto" "0")
+                     :overflow "hidden" 
+                     :margin-left (if @*hovered? "8px" "0")
+                     :transition "all 0.2s ease-in-out"
+                     :opacity (if @*hovered? "1" "0")}}
        [bp-button
         {:icon "cog"
          :class "dont-focus-block"
          :minimal true
          :small true
-         :onClick (fn [e]
+         :onClick (fn [e] 
                     (.stopPropagation e)
                     (on-settings-click))}]]]]))
 
 (defn circle-progress-bar [block-uid done total status-text on-settings-click]
   (r/with-let [*hovered? (r/atom false)]
     (let [percentage (if (zero? total)
-                       0
-                       (* (/ done total) 100))]
+                      0
+                      (* (/ done total) 100))]
       [:span.inline-flex.items-center.gap-4
        {:style {:vertical-align "middle"}
         :on-mouse-enter #(reset! *hovered? true)
@@ -269,24 +271,35 @@
          {:width viewbox-size
           :height viewbox-size
           :viewBox (str "0 0 " viewbox-size " " viewbox-size)}
-         ;; SVG content remains the same
-         ]]
+         [:circle
+          {:cx center-point
+           :cy center-point
+           :r radius
+           :fill "var(--circle-bg, #eee)"
+           :stroke "var(--circle-bg, #eee)"
+           :stroke-width "5px"}]
+         [:path
+          {:d (get-arc-path percentage)
+           :fill "var(--circle-fill, #0d8050)"
+           :stroke "none"}]]]
        [:span {:style {:display "inline-flex"
-                       :align-items "center"
-                       :gap "8px"}}
+                      :align-items "center"}}
         [:span.text-base
          (str done "/" total " " status-text " - " (int percentage) "%")]
-        [:span {:style {:opacity (if @*hovered? "1" "0")
-                        :transition "opacity 0.2s ease-in-out"}}
+        [:span {:style {:width (if @*hovered? "auto" "0")
+                       :overflow "hidden" 
+                       :margin-left (if @*hovered? "8px" "0")
+                       :transition "all 0.2s ease-in-out"
+                       :opacity (if @*hovered? "1" "0")}}
          [bp-button
           {:icon "cog"
            :class "dont-focus-block"
            :minimal true
            :small true
-           :onClick (fn [e]
+           :onClick (fn [e] 
                       (.stopPropagation e)
                       (on-settings-click))}]]]])))
-
+                      
 (defn main [{:keys [block-uid]} & args]
   (r/with-let [is-running? #(try
                               (.-running js/window.todoProgressBarExtensionData)
