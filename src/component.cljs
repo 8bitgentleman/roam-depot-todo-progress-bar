@@ -55,22 +55,40 @@
 (defn contains-embed? [block-string]
   (let [result (and block-string
                     (or (clojure.string/includes? block-string "{{embed:")
-                        (clojure.string/includes? block-string "{{[[embed]]:")
+                        (clojure.string/includes? block-string "{{[[embed]]")
                         (clojure.string/includes? block-string "{{embed-children:")
-                        (clojure.string/includes? block-string "{{[[embed-children]]:")))]
+                        (clojure.string/includes? block-string "{{[[embed-children]]")
+                        (clojure.string/includes? block-string "{{embed-path:")
+                        (clojure.string/includes? block-string "{{[[embed-path]]")))]
+    ;; Debug logging to show which blocks are detected
+    (when result
+      (js/console.log "Found embed in block:" (if (> (count block-string) 50) 
+                                              (str (subs block-string 0 50) "...")
+                                              block-string)))
     result))
 
 (defn extract-uid-from-embed [block-string]
   (when (contains-embed? block-string)
-    (let [patterns [#"\{\{embed: *\(\(([^)]+)\)\)\}\}"
-                    #"\{\{\[\[embed\]\]: *\(\(([^)]+)\)\)\}\}"
-                    #"\{\{embed-children: *\(\(([^)]+)\)\)\}\}"
-                    #"\{\{\[\[embed-children\]\]: *\(\(([^)]+)\)\)\}\}"
-                    #"\{\{\[\[embed-children\]\]: *\(\(\(\(([^)]+)\)\)\)\)\}\}"] ; Extra pattern for double parentheses
-          ;; Try each pattern and collect all matches
-          all-matches (mapcat #(re-seq % block-string) patterns)]
-      ;; Extract just the UID from each match (second item in match array)
-      (mapv second all-matches))))
+    ;; Create more robust pattern that explicitly matches all embed types we need to support
+    ;; This handles variations in the number of parentheses
+    (let [patterns [#"\{\{embed: *\({2,}([^()]+)\){2,}.*?\}\}"
+                    #"\{\{\[\[embed\]\]: *\({2,}([^()]+)\){2,}.*?\}\}"
+                    #"\{\{embed-children: *\({2,}([^()]+)\){2,}.*?\}\}"
+                    #"\{\{\[\[embed-children\]\]: *\({2,}([^()]+)\){2,}.*?\}\}"
+                    #"\{\{embed-path: *\({2,}([^()]+)\){2,}.*?\}\}"
+                    #"\{\{\[\[embed-path\]\]: *\({2,}([^()]+)\){2,}.*?\}\}"]
+          ;; Try each pattern and collect results
+          matches (mapcat #(re-seq % block-string) patterns)]
+      
+      ;; Debug logging
+      (js/console.log "Trying to match:" block-string)
+      (when (seq matches)
+        (js/console.log "Matches found:" matches))
+      
+      ;; Extract UIDs from matches
+      (let [uids (mapv second matches)]
+        (js/console.log "Extracted UIDs:" uids)
+        uids))))
 
 (defn process-block-with-embeds
   ([block] (process-block-with-embeds block #{}))
@@ -83,6 +101,13 @@
                                has-embed)
                       (extract-uid-from-embed block-string))
          updated-visited (conj visited-uids block-uid)]
+     
+     ;; Add debug logging for tracking embed processing
+     (when has-embed
+       (js/console.log "Processing block with embed:" block-uid 
+                      "Found embed UIDs:" (pr-str embed-uids)
+                      "Visited count:" (count visited-uids)))
+     
      (concat
       ;; Process this block normally
       (list (dissoc block :block/children))
@@ -91,11 +116,15 @@
       ;; Process any embedded blocks
       (when (seq embed-uids)
         (mapcat (fn [uid]
+                  (js/console.log "Processing embed with UID:" uid)
                   (when-let [embedded-block
                              @(dr/pull '[:block/uid :block/string :block/refs {:block/children ...}]
                                       [:block/uid uid])]
                     ;; Only process if not already visited (prevent cycles)
-                    (when-not (contains? updated-visited uid)
+                    (if (contains? updated-visited uid)
+                      (do
+                        (js/console.log "Skipping already visited block:" uid)
+                        nil)
                       (process-block-with-embeds embedded-block updated-visited))))
                 embed-uids))))))
 
@@ -291,6 +320,7 @@
                                 false))
                *running? (r/atom (or (is-running?) nil))
                *settings-open? (r/atom false)
+               _ (js/console.log "Component initialized with args:" (pr-str args) "block-uid:" block-uid)
                check-interval (js/setInterval #(reset! *running? (is-running?)) 5000)]
     (case @*running?
       nil [:div [:strong "Loading progress bar extension..."]]
@@ -299,11 +329,18 @@
       (let [style (or (first args) "horizontal")
             status-text (or (second args) "Done")
             include-embeds (= (nth (vec args) 2 nil) "include-embeds")
+            ;; searching through embeds is disabled by default
+            ;; because it can be slow and may not be necessary
             search-fn (if include-embeds recurse-search-with-embeds recurse-search)
+            _ (when include-embeds (js/console.log "Using embed search function"))
             todo-refs (search-fn block-uid)
             tasks {:todo (count-occurrences "TODO" todo-refs)
                    :done (count-occurrences "DONE" todo-refs)}
             total (+ (:todo tasks) (:done tasks))]
+        
+        (js/console.log "Search results:" (pr-str todo-refs))
+        (js/console.log "Tasks count:" (pr-str tasks) "Total:" total "Include embeds:" include-embeds)
+        
         [:span.dont-focus-block {:on-click (fn [e] (.stopPropagation e))}
          [bp-popover
           {:isOpen @*settings-open?
