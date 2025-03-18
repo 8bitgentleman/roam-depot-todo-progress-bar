@@ -54,12 +54,9 @@
 ;; Embed detection and processing
 (defn contains-embed? [block-string]
   (let [result (and block-string
-                    (or (clojure.string/includes? block-string "{{embed:")
-                        (clojure.string/includes? block-string "{{[[embed]]")
-                        (clojure.string/includes? block-string "{{embed-children:")
-                        (clojure.string/includes? block-string "{{[[embed-children]]")
-                        (clojure.string/includes? block-string "{{embed-path:")
-                        (clojure.string/includes? block-string "{{[[embed-path]]")))]
+                    ;; Use a single regex to check for the overall pattern
+                    ;; This is more efficient than multiple string includes calls
+                    (re-find #"\{\{.*?embed.*?:.*?\(\(.*?\)\).*?\}\}" block-string))]
     ;; Debug logging to show which blocks are detected
     (when result
       (js/console.log "Found embed in block:" (if (> (count block-string) 50) 
@@ -69,16 +66,11 @@
 
 (defn extract-uid-from-embed [block-string]
   (when (contains-embed? block-string)
-    ;; Create more robust pattern that explicitly matches all embed types we need to support
-    ;; This handles variations in the number of parentheses
-    (let [patterns [#"\{\{embed: *\({2,}([^()]+)\){2,}.*?\}\}"
-                    #"\{\{\[\[embed\]\]: *\({2,}([^()]+)\){2,}.*?\}\}"
-                    #"\{\{embed-children: *\({2,}([^()]+)\){2,}.*?\}\}"
-                    #"\{\{\[\[embed-children\]\]: *\({2,}([^()]+)\){2,}.*?\}\}"
-                    #"\{\{embed-path: *\({2,}([^()]+)\){2,}.*?\}\}"
-                    #"\{\{\[\[embed-path\]\]: *\({2,}([^()]+)\){2,}.*?\}\}"]
-          ;; Try each pattern and collect results
-          matches (mapcat #(re-seq % block-string) patterns)]
+    ;; Unified pattern that matches any embed format as long as it contains 
+    ;; {{ ... embed ... : ... (( ... )) ... }}
+    ;; The key is to extract the UID (content between the innermost parentheses)
+    (let [pattern #"\{\{.*?embed.*?:.*?\(\(([^()]+)\)\).*?\}\}"
+          matches (re-seq pattern block-string)]
       
       ;; Debug logging
       (js/console.log "Trying to match:" block-string)
