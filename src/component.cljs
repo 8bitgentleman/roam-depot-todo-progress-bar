@@ -57,11 +57,6 @@
                     ;; Use a single regex to check for the overall pattern
                     ;; This is more efficient than multiple string includes calls
                     (re-find #"\{\{.*?embed.*?:.*?\(\(.*?\)\).*?\}\}" block-string))]
-    ;; Debug logging to show which blocks are detected
-    (when result
-      (js/console.log "Found embed in block:" (if (> (count block-string) 50) 
-                                              (str (subs block-string 0 50) "...")
-                                              block-string)))
     result))
 
 (defn extract-uid-from-embed [block-string]
@@ -72,15 +67,7 @@
     (let [pattern #"\{\{.*?embed.*?:.*?\(\(([^()]+)\)\).*?\}\}"
           matches (re-seq pattern block-string)]
       
-      ;; Debug logging
-      (js/console.log "Trying to match:" block-string)
-      (when (seq matches)
-        (js/console.log "Matches found:" matches))
-      
-      ;; Extract UIDs from matches
-      (let [uids (mapv second matches)]
-        (js/console.log "Extracted UIDs:" uids)
-        uids))))
+        )))
 
 (defn process-block-with-embeds
   ([block] (process-block-with-embeds block #{}))
@@ -94,12 +81,6 @@
                       (extract-uid-from-embed block-string))
          updated-visited (conj visited-uids block-uid)]
      
-     ;; Add debug logging for tracking embed processing
-     (when has-embed
-       (js/console.log "Processing block with embed:" block-uid 
-                      "Found embed UIDs:" (pr-str embed-uids)
-                      "Visited count:" (count visited-uids)))
-     
      (concat
       ;; Process this block normally
       (list (dissoc block :block/children))
@@ -108,14 +89,12 @@
       ;; Process any embedded blocks
       (when (seq embed-uids)
         (mapcat (fn [uid]
-                  (js/console.log "Processing embed with UID:" uid)
                   (when-let [embedded-block
                              @(dr/pull '[:block/uid :block/string :block/refs {:block/children ...}]
                                       [:block/uid uid])]
                     ;; Only process if not already visited (prevent cycles)
                     (if (contains? updated-visited uid)
                       (do
-                        (js/console.log "Skipping already visited block:" uid)
                         nil)
                       (process-block-with-embeds embedded-block updated-visited))))
                 embed-uids))))))
@@ -312,7 +291,6 @@
                                 false))
                *running? (r/atom (or (is-running?) nil))
                *settings-open? (r/atom false)
-               _ (js/console.log "Component initialized with args:" (pr-str args) "block-uid:" block-uid)
                check-interval (js/setInterval #(reset! *running? (is-running?)) 5000)]
     (case @*running?
       nil [:div [:strong "Loading progress bar extension..."]]
@@ -324,14 +302,14 @@
             ;; searching through embeds is disabled by default
             ;; because it can be slow and may not be necessary
             search-fn (if include-embeds recurse-search-with-embeds recurse-search)
-            _ (when include-embeds (js/console.log "Using embed search function"))
             todo-refs (search-fn block-uid)
+            _ (js/console.log (pr-str block-uid))
             tasks {:todo (count-occurrences "TODO" todo-refs)
                    :done (count-occurrences "DONE" todo-refs)}
             total (+ (:todo tasks) (:done tasks))]
-        
-        (js/console.log "Search results:" (pr-str todo-refs))
-        (js/console.log "Tasks count:" (pr-str tasks) "Total:" total "Include embeds:" include-embeds)
+
+        ;; (js/console.log "Search results:" (pr-str todo-refs))
+        ;; (js/console.log "Tasks count:" (pr-str tasks) "Total:" total "Include embeds:" include-embeds)
         
         [:span.dont-focus-block {:on-click (fn [e] (.stopPropagation e))}
          [bp-popover
