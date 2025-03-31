@@ -76,9 +76,9 @@
        (flatten)
        (map :db/id) ;; manipulate the data to get just the ids of the pages referenced in those blocks
        (map info-from-id) ;; gets a page name from the db id
-       (#(debug "After info-from-id" %))
+      ;;  (#(debug "After info-from-id" %))
        (flatten)
-       (#(debug "Final result" %))
+      ;;  (#(debug "Final result" %))
       )
     )
 
@@ -245,13 +245,9 @@
       (let [style (or (first args) "horizontal")
             status-text (or (second args) "Done")
             todo-refs (recurse-search block-uid)
-            ;; _ (js/console.log (pr-str block-uid))
             tasks {:todo (count-occurrences "TODO" todo-refs)
                    :done (count-occurrences "DONE" todo-refs)}
             total (+ (:todo tasks) (:done tasks))]
-
-        ;; (js/console.log "Search results:" (pr-str todo-refs))
-        ;; (js/console.log "Tasks count:" (pr-str tasks) "Total:" total)
         
         [:span.dont-focus-block {:on-click (fn [e] (.stopPropagation e))}
          [bp-popover
