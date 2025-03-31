@@ -12,6 +12,12 @@
 (def viewbox-size (* 2 base-size))
 (def center-point base-size)
 
+(defn debug
+  "Debug function that converts ClojureScript data to JavaScript objects for better console display"
+  [label data]
+  (js/console.log label (clj->js data))
+  data)
+
 (defn calculate-coordinates [percentage]
   (let [angle (* (/ percentage 100) (* 2 js/Math.PI))
         x (+ center-point (* radius (js/Math.sin angle)))
@@ -51,67 +57,7 @@
        (filter #{s})
        count))
 
-;; Embed detection and processing
-(defn contains-embed? [block-string]
-  (let [result (and block-string
-                    ;; Use a single regex to check for the overall pattern
-                    ;; This is more efficient than multiple string includes calls
-                    (re-find #"\{\{.*?embed.*?:.*?\(\(.*?\)\).*?\}\}" block-string))]
-    result))
-
-(defn extract-uid-from-embed [block-string]
-  (when (contains-embed? block-string)
-    ;; Unified pattern that matches any embed format as long as it contains 
-    ;; {{ ... embed ... : ... (( ... )) ... }}
-    ;; The key is to extract the UID (content between the innermost parentheses)
-    (let [pattern #"\{\{.*?embed.*?:.*?\(\(([^()]+)\)\).*?\}\}"
-          matches (re-seq pattern block-string)]
-      
-        )))
-
-(defn process-block-with-embeds
-  ([block] (process-block-with-embeds block #{}))
-  ([block visited-uids]
-   (let [block-uid (:block/uid block)
-         block-string (:block/string block)
-         has-embed (contains-embed? block-string)
-         embed-uids (when (and block-string
-                               (not (contains? visited-uids block-uid))
-                               has-embed)
-                      (extract-uid-from-embed block-string))
-         updated-visited (conj visited-uids block-uid)]
-     
-     (concat
-      ;; Process this block normally
-      (list (dissoc block :block/children))
-      ;; Process its children
-      (mapcat #(process-block-with-embeds % updated-visited) (:block/children block))
-      ;; Process any embedded blocks
-      (when (seq embed-uids)
-        (mapcat (fn [uid]
-                  (when-let [embedded-block
-                             @(dr/pull '[:block/uid :block/string :block/refs {:block/children ...}]
-                                      [:block/uid uid])]
-                    ;; Only process if not already visited (prevent cycles)
-                    (if (contains? updated-visited uid)
-                      (do
-                        nil)
-                      (process-block-with-embeds embedded-block updated-visited))))
-                embed-uids))))))
-
-(defn find-child-refs-with-embeds [block-uid]
-  (let [block @(dr/pull '[:block/uid :block/string :block/refs {:block/children ...}] 
-                        [:block/uid block-uid])]
-    (process-block-with-embeds block)))
-
-(defn recurse-search-with-embeds [block-uid]
-  (->> block-uid
-       (find-child-refs-with-embeds)
-       (keep :block/refs)
-       (flatten)
-       (map :db/id)
-       (map info-from-id)
-       (flatten)))
+;; Legacy function kept for backward compatibility
 
 ;; Legacy function kept for backward compatibility
 (defn find-child-refs [block-uid]
@@ -119,14 +65,22 @@
                  @(dr/pull '[:block/refs {:block/children ...}]
                           [:block/uid block-uid])))
 
+;; Main approach to find all references in child blocks
+;; so the issue here was that the top level embeded block is already being included i
+;; in the todo count. to 'really' count embeds we'd have to get the children of the embed
+
 (defn recurse-search [block-uid]
   (->> block-uid
-       (find-child-refs)
-       (keep :block/refs)
+       (find-child-refs) ;; a list of all blocks that reference pages
+       (keep :block/refs) ;; pulls out just the refs for each block. this would include any pages
        (flatten)
-       (map :db/id)
-       (map info-from-id)
-       (flatten)))
+       (map :db/id) ;; manipulate the data to get just the ids of the pages referenced in those blocks
+       (map info-from-id) ;; gets a page name from the db id
+       (#(debug "After info-from-id" %))
+       (flatten)
+       (#(debug "Final result" %))
+      )
+    )
 
 ;; BlueprintJS component adaptations
 (def bp-button (r/adapt-react-class bp-core/Button))
@@ -144,31 +98,29 @@
           matches (re-find pattern block-string)]
       (second matches))))
 
-(defn format-render-string [current-string style status-text include-embeds]
+(defn format-render-string [current-string style status-text]
   (if-let [code-block-uid (get-component-code-uid current-string)]
     (let [pattern #"\{\{(?:\[\[)?roam/render(?:\]\])?: *\(\([^)]+\)\).*?\}\}"
           replacement (str "{{roam/render: ((" code-block-uid ")) \"" 
                          style "\" \"" 
                          status-text "\"" 
-                         (when include-embeds " \"include-embeds\"") 
                          "}}")]
       (clojure.string/replace current-string pattern replacement))
     current-string))
 
-(defn update-block-string [block-uid style status-text include-embeds]
+(defn update-block-string [block-uid style status-text]
   (let [current-block @(dr/pull '[:block/string] [:block/uid block-uid])
         current-string (:block/string current-block)
-        new-string (format-render-string current-string style status-text include-embeds)]
+        new-string (format-render-string current-string style status-text)]
     (when (not= current-string new-string)
       (block/update
         {:block {:uid block-uid
                  :string new-string}}))))
 
 ;; Settings menu
-(defn settings-menu [block-uid current-style current-status-text current-include-embeds on-close]
+(defn settings-menu [block-uid current-style current-status-text on-close]
   (let [*style (r/atom current-style)
-        *status-text (r/atom current-status-text)
-        *include-embeds (r/atom current-include-embeds)]
+        *status-text (r/atom current-status-text)]
     (fn []
       [:div.bp3-card.dont-focus-block {:style {:padding "10px" :min-width "250px"}
                                        :on-click (fn [e] (.stopPropagation e))}
@@ -187,12 +139,6 @@
                    :onChange #(reset! *status-text (.. % -target -value))
                    :placeholder "Done"}]]
 
-       [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
-        [bp-switch {:checked @*include-embeds
-                    :class "dont-focus-block"
-                    :onChange #(swap! *include-embeds not)
-                    :label "Include embedded blocks"}]]
-
        [:div.button-group.dont-focus-block {:style {:display "flex" :justify-content "flex-end" :gap "8px"}}
         [bp-button {:onClick on-close
                     :class "dont-focus-block"
@@ -203,7 +149,7 @@
             :onClick (fn [e]
                        (.stopPropagation e)
                        (.preventDefault e)
-                       (update-block-string block-uid @*style @*status-text @*include-embeds)
+                       (update-block-string block-uid @*style @*status-text)
                        (on-close))}
           "Apply"]
          ]])))
@@ -298,18 +244,14 @@
                    "Extension not installed. Please install Todo Progress Bar from Roam Depot."]]
       (let [style (or (first args) "horizontal")
             status-text (or (second args) "Done")
-            include-embeds (= (nth (vec args) 2 nil) "include-embeds")
-            ;; searching through embeds is disabled by default
-            ;; because it can be slow and may not be necessary
-            search-fn (if include-embeds recurse-search-with-embeds recurse-search)
-            todo-refs (search-fn block-uid)
-            _ (js/console.log (pr-str block-uid))
+            todo-refs (recurse-search block-uid)
+            ;; _ (js/console.log (pr-str block-uid))
             tasks {:todo (count-occurrences "TODO" todo-refs)
                    :done (count-occurrences "DONE" todo-refs)}
             total (+ (:todo tasks) (:done tasks))]
 
         ;; (js/console.log "Search results:" (pr-str todo-refs))
-        ;; (js/console.log "Tasks count:" (pr-str tasks) "Total:" total "Include embeds:" include-embeds)
+        ;; (js/console.log "Tasks count:" (pr-str tasks) "Total:" total)
         
         [:span.dont-focus-block {:on-click (fn [e] (.stopPropagation e))}
          [bp-popover
@@ -321,7 +263,6 @@
                                    block-uid
                                    style
                                    status-text
-                                   include-embeds
                                    #(reset! *settings-open? false)])}
           (if (= style "radial")
             [circle-progress-bar block-uid (:done tasks) total status-text #(reset! *settings-open? true)]
