@@ -2,7 +2,7 @@ import { toggleRenderComponent, toggleStrikethroughCSS, updateCodeBlock, updateC
 //setting this up to be as generic as possible
 //should mostly need to edit the top variables when creating a new extension/version
 const componentName = 'TODO Progress Bar';
-const version = 'v14';
+const version = 'v17';
 
 const componentLowerName = componentName.replaceAll(" ", "-").toLowerCase();
 const codeBlockUID = 'roam-render-todo-progress-cljs';

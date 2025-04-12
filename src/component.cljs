@@ -1,4 +1,4 @@
-(ns progress-bar-v16
+(ns progress-bar-v17
   (:require
    [reagent.core :as r]
    [datascript.core :as d]
@@ -98,29 +98,30 @@
           matches (re-find pattern block-string)]
       (second matches))))
 
-(defn format-render-string [current-string style status-text]
+(defn format-render-string [current-string style status-text show-percent]
   (if-let [code-block-uid (get-component-code-uid current-string)]
     (let [pattern #"\{\{(?:\[\[)?roam/render(?:\]\])?: *\(\([^)]+\)\).*?\}\}"
           replacement (str "{{roam/render: ((" code-block-uid ")) \"" 
                          style "\" \"" 
-                         status-text "\"" 
-                         "}}")]
+                         status-text "\" \"" 
+                         show-percent "\"}}")]
       (clojure.string/replace current-string pattern replacement))
     current-string))
 
-(defn update-block-string [block-uid style status-text]
+(defn update-block-string [block-uid style status-text show-percent]
   (let [current-block @(dr/pull '[:block/string] [:block/uid block-uid])
         current-string (:block/string current-block)
-        new-string (format-render-string current-string style status-text)]
+        new-string (format-render-string current-string style status-text show-percent)]
     (when (not= current-string new-string)
       (block/update
         {:block {:uid block-uid
                  :string new-string}}))))
 
 ;; Settings menu
-(defn settings-menu [block-uid current-style current-status-text on-close]
+(defn settings-menu [block-uid current-style current-status-text current-show-percent on-close]
   (let [*style (r/atom current-style)
-        *status-text (r/atom current-status-text)]
+        *status-text (r/atom current-status-text)
+        *show-percent (r/atom current-show-percent)]
     (fn []
       [:div.bp3-card.dont-focus-block {:style {:padding "10px" :min-width "250px"}
                                        :on-click (fn [e] (.stopPropagation e))}
@@ -138,6 +139,12 @@
                    :class "dont-focus-block"
                    :onChange #(reset! *status-text (.. % -target -value))
                    :placeholder "Done"}]]
+        
+       [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
+        [:label.bp3-label.dont-focus-block "Show Percentage"]
+        [bp-switch {:checked (or (= @*show-percent "true") (= @*show-percent true))
+                    :class "dont-focus-block"
+                    :onChange #(reset! *show-percent (str (.. % -target -checked)))}]]
 
        [:div.button-group.dont-focus-block {:style {:display "flex" :justify-content "flex-end" :gap "8px"}}
         [bp-button {:onClick on-close
@@ -149,12 +156,12 @@
             :onClick (fn [e]
                        (.stopPropagation e)
                        (.preventDefault e)
-                       (update-block-string block-uid @*style @*status-text)
+                       (update-block-string block-uid @*style @*status-text @*show-percent)
                        (on-close))}
           "Apply"]
          ]])))
 
-(defn horizontal-progress-bar [block-uid done total status-text on-settings-click]
+(defn horizontal-progress-bar [block-uid done total status-text show-percent on-settings-click]
   (r/with-let [*hovered? (r/atom false)]
     [:span {:style {:display "inline-flex"
                    :align-items "center"
@@ -172,7 +179,9 @@
      [:span {:style {:white-space "nowrap"
                     :display "inline-flex"
                     :align-items "center"}}
-      [:span (str done "/" total " " status-text)]
+      [:span (str done "/" total " " status-text
+                (when (or (= show-percent "true") (= show-percent true))
+                  (str " - " (if (zero? total) 0 (int (* (/ done total) 100))) "%")))]
       [:span {:style {:max-width (if @*hovered? "30px" "0px")
                      :overflow "hidden" 
                      :margin-left (if @*hovered? "8px" "0")
@@ -188,7 +197,7 @@
                     (.stopPropagation e)
                     (on-settings-click))}]]]]))
 
-(defn circle-progress-bar [block-uid done total status-text on-settings-click]
+(defn circle-progress-bar [block-uid done total status-text show-percent on-settings-click]
   (r/with-let [*hovered? (r/atom false)]
     (let [percentage (if (zero? total)
                       0
@@ -216,7 +225,9 @@
        [:span {:style {:display "inline-flex"
                       :align-items "center"}}
         [:span.text-base
-         (str done "/" total " " status-text " - " (int percentage) "%")]
+         (str done "/" total " " status-text
+              (when (or (= show-percent "true") (= show-percent true))
+                (str " - " (int percentage) "%")))]
         [:span {:style {:max-width (if @*hovered? "30px" "0px")
                        :overflow "hidden" 
                        :margin-left (if @*hovered? "8px" "0")
@@ -246,6 +257,7 @@
                    "Extension not installed. Please install Todo Progress Bar from Roam Depot."]]
       (let [style (or (first args) "horizontal")
             status-text (or (second args) "Done")
+            show-percent (or (nth args 2 "false"))
             todo-refs (recurse-search block-uid)
             tasks {:todo (count-occurrences "TODO" todo-refs)
                    :done (count-occurrences "DONE" todo-refs)}
@@ -261,10 +273,11 @@
                                    block-uid
                                    style
                                    status-text
+                                   show-percent
                                    #(reset! *settings-open? false)])}
           (if (= style "radial")
-            [circle-progress-bar block-uid (:done tasks) total status-text #(reset! *settings-open? true)]
-            [horizontal-progress-bar block-uid (:done tasks) total status-text #(reset! *settings-open? true)])]]))
+            [circle-progress-bar block-uid (:done tasks) total status-text show-percent #(reset! *settings-open? true)]
+            [horizontal-progress-bar block-uid (:done tasks) total status-text show-percent #(reset! *settings-open? true)])]]))
 
     (finally
       (js/clearInterval check-interval))))
