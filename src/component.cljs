@@ -173,11 +173,12 @@
                     :display "inline-flex"
                     :align-items "center"}}
       [:span (str done "/" total " " status-text)]
-      [:span {:style {:width (if @*hovered? "auto" "0")
+      [:span {:style {:max-width (if @*hovered? "30px" "0px")
                      :overflow "hidden" 
                      :margin-left (if @*hovered? "8px" "0")
-                     :transition "all 0.2s ease-in-out"
-                     :opacity (if @*hovered? "1" "0")}}
+                     :transition "all 0.3s ease-in-out"
+                     :opacity (if @*hovered? "1" "0")
+                     :display "inline-block"}}
        [bp-button
         {:icon "cog"
          :class "dont-focus-block"
@@ -192,7 +193,7 @@
     (let [percentage (if (zero? total)
                       0
                       (* (/ done total) 100))]
-      [:span.inline-flex.items-center.gap-4
+      [:span.inline-flex.items-center.gap-2
        {:style {:vertical-align "middle"}
         :on-mouse-enter #(reset! *hovered? true)
         :on-mouse-leave #(reset! *hovered? false)}
@@ -216,11 +217,12 @@
                       :align-items "center"}}
         [:span.text-base
          (str done "/" total " " status-text " - " (int percentage) "%")]
-        [:span {:style {:width (if @*hovered? "auto" "0")
+        [:span {:style {:max-width (if @*hovered? "30px" "0px")
                        :overflow "hidden" 
                        :margin-left (if @*hovered? "8px" "0")
-                       :transition "all 0.2s ease-in-out"
-                       :opacity (if @*hovered? "1" "0")}}
+                       :transition "all 0.3s ease-in-out"
+                       :opacity (if @*hovered? "1" "0")
+                       :display "inline-block"}}
          [bp-button
           {:icon "cog"
            :class "dont-focus-block"
