@@ -137,6 +137,7 @@
         [:label.bp3-label.dont-focus-block "Status Text"]
         [bp-input {:value @*status-text
                    :class "dont-focus-block"
+                   :autoFocus true
                    :onChange #(reset! *status-text (.. % -target -value))
                    :placeholder "Done"}]]
         
