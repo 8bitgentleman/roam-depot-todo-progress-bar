@@ -157,7 +157,7 @@
                     :onChange #(reset! *show-percent (str (.. % -target -checked)))}]]
 
        [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
-        [:label.bp3-label.dont-focus-block "Exclude Block References"]
+        [:label.bp3-label.dont-focus-block "Exclude Reference-Only Blocks"]
         [bp-switch {:checked (or (= @*exclude-blockrefs "true") (= @*exclude-blockrefs true))
                     :class "dont-focus-block"
                     :onChange #(reset! *exclude-blockrefs (str (.. % -target -checked)))}]]
