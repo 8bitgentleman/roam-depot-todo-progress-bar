@@ -57,30 +57,38 @@
        (filter #{s})
        count))
 
-;; Legacy function kept for backward compatibility
+(defn is-block-ref?
+  "Returns true if block-string is a pure block reference ((uid)).
+   Roam UIDs are exactly 9 characters: [a-zA-Z0-9_-]{9}"
+  [block-string]
+  (when block-string
+    (boolean (re-matches #"^\s*\(\([a-zA-Z0-9_-]{9}\)\)\s*$" block-string))))
 
 ;; Legacy function kept for backward compatibility
 (defn find-child-refs [block-uid]
   (flatten-block []
-                 @(dr/pull '[:block/refs {:block/children ...}]
+                 @(dr/pull '[:block/refs :block/string {:block/children ...}]
                           [:block/uid block-uid])))
 
 ;; Main approach to find all references in child blocks
 ;; so the issue here was that the top level embeded block is already being included i
 ;; in the todo count. to 'really' count embeds we'd have to get the children of the embed
 
-(defn recurse-search [block-uid]
-  (->> block-uid
-       (find-child-refs) ;; a list of all blocks that reference pages
-       (keep :block/refs) ;; pulls out just the refs for each block. this would include any pages
-       (flatten)
-       (map :db/id) ;; manipulate the data to get just the ids of the pages referenced in those blocks
-       (map info-from-id) ;; gets a page name from the db id
-      ;;  (#(debug "After info-from-id" %))
-       (flatten)
-      ;;  (#(debug "Final result" %))
-      )
-    )
+(defn recurse-search
+  "Search for TODO/DONE refs in child blocks.
+   When exclude-blockrefs? is true, blocks that are just block references ((uid)) are excluded."
+  ([block-uid] (recurse-search block-uid false))
+  ([block-uid exclude-blockrefs?]
+   (let [blocks (find-child-refs block-uid)
+         filtered-blocks (if exclude-blockrefs?
+                           (remove #(is-block-ref? (:block/string %)) blocks)
+                           blocks)]
+     (->> filtered-blocks
+          (keep :block/refs) ;; pulls out just the refs for each block. this would include any pages
+          (flatten)
+          (map :db/id) ;; manipulate the data to get just the ids of the pages referenced in those blocks
+          (map info-from-id) ;; gets a page name from the db id
+          (flatten)))))
 
 ;; BlueprintJS component adaptations
 (def bp-button (r/adapt-react-class bp-core/Button))
@@ -98,30 +106,32 @@
           matches (re-find pattern block-string)]
       (second matches))))
 
-(defn format-render-string [current-string style status-text show-percent]
+(defn format-render-string [current-string style status-text show-percent exclude-blockrefs]
   (if-let [code-block-uid (get-component-code-uid current-string)]
     (let [pattern #"\{\{(?:\[\[)?roam/render(?:\]\])?: *\(\([^)]+\)\).*?\}\}"
-          replacement (str "{{roam/render: ((" code-block-uid ")) \"" 
-                         style "\" \"" 
-                         status-text "\" \"" 
-                         show-percent "\"}}")]
+          replacement (str "{{roam/render: ((" code-block-uid ")) \""
+                         style "\" \""
+                         status-text "\" \""
+                         show-percent "\" \""
+                         exclude-blockrefs "\"}}")]
       (clojure.string/replace current-string pattern replacement))
     current-string))
 
-(defn update-block-string [block-uid style status-text show-percent]
+(defn update-block-string [block-uid style status-text show-percent exclude-blockrefs]
   (let [current-block @(dr/pull '[:block/string] [:block/uid block-uid])
         current-string (:block/string current-block)
-        new-string (format-render-string current-string style status-text show-percent)]
+        new-string (format-render-string current-string style status-text show-percent exclude-blockrefs)]
     (when (not= current-string new-string)
       (block/update
         {:block {:uid block-uid
                  :string new-string}}))))
 
 ;; Settings menu
-(defn settings-menu [block-uid current-style current-status-text current-show-percent on-close]
+(defn settings-menu [block-uid current-style current-status-text current-show-percent current-exclude-blockrefs on-close]
   (let [*style (r/atom current-style)
         *status-text (r/atom current-status-text)
-        *show-percent (r/atom current-show-percent)]
+        *show-percent (r/atom current-show-percent)
+        *exclude-blockrefs (r/atom current-exclude-blockrefs)]
     (fn []
       [:div.bp3-card.dont-focus-block {:style {:padding "10px" :min-width "250px"}
                                        :on-click (fn [e] (.stopPropagation e))}
@@ -140,12 +150,18 @@
                    :autoFocus true
                    :onChange #(reset! *status-text (.. % -target -value))
                    :placeholder "Done"}]]
-        
+
        [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
         [:label.bp3-label.dont-focus-block "Show Percentage"]
         [bp-switch {:checked (or (= @*show-percent "true") (= @*show-percent true))
                     :class "dont-focus-block"
                     :onChange #(reset! *show-percent (str (.. % -target -checked)))}]]
+
+       [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
+        [:label.bp3-label.dont-focus-block "Exclude Reference-Only Blocks"]
+        [bp-switch {:checked (or (= @*exclude-blockrefs "true") (= @*exclude-blockrefs true))
+                    :class "dont-focus-block"
+                    :onChange #(reset! *exclude-blockrefs (str (.. % -target -checked)))}]]
 
        [:div.button-group.dont-focus-block {:style {:display "flex" :justify-content "flex-end" :gap "8px"}}
         [bp-button {:onClick on-close
@@ -157,7 +173,7 @@
             :onClick (fn [e]
                        (.stopPropagation e)
                        (.preventDefault e)
-                       (update-block-string block-uid @*style @*status-text @*show-percent)
+                       (update-block-string block-uid @*style @*status-text @*show-percent @*exclude-blockrefs)
                        (on-close))}
           "Apply"]
          ]])))
@@ -258,12 +274,14 @@
                    "Extension not installed. Please install Todo Progress Bar from Roam Depot."]]
       (let [style (or (first args) "horizontal")
             status-text (or (second args) "Done")
-            show-percent (or (nth args 2 "false"))
-            todo-refs (recurse-search block-uid)
+            show-percent (or (nth args 2 nil) "false")
+            exclude-blockrefs (or (nth args 3 nil) "false")
+            exclude-blockrefs? (or (= exclude-blockrefs "true") (= exclude-blockrefs true))
+            todo-refs (recurse-search block-uid exclude-blockrefs?)
             tasks {:todo (count-occurrences "TODO" todo-refs)
                    :done (count-occurrences "DONE" todo-refs)}
             total (+ (:todo tasks) (:done tasks))]
-        
+
         [:span.dont-focus-block {:on-click (fn [e] (.stopPropagation e))}
          [bp-popover
           {:isOpen @*settings-open?
@@ -275,6 +293,7 @@
                                    style
                                    status-text
                                    show-percent
+                                   exclude-blockrefs
                                    #(reset! *settings-open? false)])}
           (if (= style "radial")
             [circle-progress-bar block-uid (:done tasks) total status-text show-percent #(reset! *settings-open? true)]
