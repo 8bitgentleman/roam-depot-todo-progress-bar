@@ -251,21 +251,37 @@
 
 (defn main [{:keys [block-uid]} & args]
   (r/with-let [*settings-open? (r/atom false)
-               *ext-ready? (r/atom (extension-running?))
-               check-interval (when-not (extension-running?)
-                                (js/setInterval
-                                 (fn []
-                                   (when (extension-running?)
-                                     (reset! *ext-ready? true)))
-                                 500))
-               _ (js/setTimeout
-                  (fn []
-                    (when check-interval
-                      (js/clearInterval check-interval)))
-                  10000)]
-    (if-not @*ext-ready?
-      [:div [:strong {:style {:color "red"}}
-             "Extension not installed. Please install Todo Progress Bar from Roam Depot."]]
+               *ext-state (r/atom (if (extension-running?) :ready :loading))
+               *check-interval (atom nil)
+               *check-timeout (atom nil)
+               _ (when (= @*ext-state :loading)
+                   (reset! *check-interval
+                           (js/setInterval
+                            (fn []
+                              (when (extension-running?)
+                                (reset! *ext-state :ready)
+                                (when-let [interval-id @*check-interval]
+                                  (js/clearInterval interval-id)
+                                  (reset! *check-interval nil))
+                                (when-let [timeout-id @*check-timeout]
+                                  (js/clearTimeout timeout-id)
+                                  (reset! *check-timeout nil))))
+                            500)))
+               _ (when (= @*ext-state :loading)
+                   (reset! *check-timeout
+                           (js/setTimeout
+                            (fn []
+                              (when (= @*ext-state :loading)
+                                (reset! *ext-state :missing))
+                              (when-let [interval-id @*check-interval]
+                                (js/clearInterval interval-id)
+                                (reset! *check-interval nil)))
+                            10000)))]
+    (if (= @*ext-state :loading)
+      [:div "Loading Todo Progress Bar..."]
+      (if (= @*ext-state :missing)
+        [:div [:strong {:style {:color "red"}}
+               "Extension not installed. Please install Todo Progress Bar from Roam Depot."]]
       (let [style (or (first args) "horizontal")
             status-text (or (second args) "Done")
             show-percent (or (nth args 2 nil) "false")
@@ -287,7 +303,9 @@
                                    #(reset! *settings-open? false)])}
           (if (= style "radial")
             [circle-progress-bar (:done tasks) total status-text show-percent #(reset! *settings-open? true)]
-            [horizontal-progress-bar (:done tasks) total status-text show-percent #(reset! *settings-open? true)])]]))
+            [horizontal-progress-bar (:done tasks) total status-text show-percent #(reset! *settings-open? true)])]])))
     (finally
-      (when check-interval
-        (js/clearInterval check-interval))))))
+      (when-let [interval-id @*check-interval]
+        (js/clearInterval interval-id))
+      (when-let [timeout-id @*check-timeout]
+        (js/clearTimeout timeout-id))))))
