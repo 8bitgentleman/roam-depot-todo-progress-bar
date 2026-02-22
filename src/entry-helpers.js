@@ -72,7 +72,7 @@ async function createBlockIfMissing({ parentUID, uid, order, string, open, headi
 
 async function updateBlockStringIfChanged(uid, nextString) {
   const current = getBlock(uid, "[:block/uid :block/string]");
-  if (!current || current.string === nextString) return false;
+  if (!current || current[":block/string"] === nextString) return false;
 
   await roamAlphaAPI.updateBlock({
     block: {
@@ -209,4 +209,3 @@ export async function toggleStrikethroughCSS(state) {
     removeBlock(STRIKETHROUGH_PARENT_UID);
   }
 }
-
