@@ -1,7 +1,7 @@
 import { ensureTodoProgressComponent, toggleStrikethroughCSS } from "./entry-helpers";
 
 const componentName = "TODO Progress Bar";
-const version = "v18";
+const version = "v19";
 
 const codeBlockUID = "roam-render-todo-progress-cljs";
 const cssBlockUID = "roam-render-todo-progress-css";

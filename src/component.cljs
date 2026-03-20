@@ -1,4 +1,4 @@
-(ns progress-bar-v18
+(ns progress-bar-v19
   (:require
    [reagent.core :as r]
    [roam.datascript.reactive :as dr]
@@ -11,6 +11,35 @@
 (def radius (* 0.75 base-size))
 (def viewbox-size (* 2 base-size))
 (def center-point base-size)
+
+;; Hill diagram configuration
+(def hill-w 200)
+(def hill-h 90)
+(def hill-baseline 73)
+(def hill-amplitude 50)
+(def hill-center (/ hill-w 2))
+(def hill-sigma 40)
+
+(defn hill-gaussian-y [x]
+  (let [dx (- x hill-center)]
+    (- hill-baseline (* hill-amplitude (js/Math.exp (- (/ (* dx dx) (* 2 hill-sigma hill-sigma))))))))
+
+(defn make-hill-path []
+  (let [n 80]
+    (str/join " "
+              (map-indexed (fn [i _]
+                             (let [x (* (/ i n) hill-w)
+                                   y (hill-gaussian-y x)]
+                               (str (if (zero? i) "M" "L") " " x "," y)))
+                           (range (inc n))))))
+
+(def hill-dot-r 4)
+
+(defn hill-dot-pos [percentage]
+  (let [raw-x (* (/ percentage 100) hill-w)
+        x (max hill-dot-r (min (- hill-w hill-dot-r) raw-x))
+        y (hill-gaussian-y x)]
+    [x y]))
 
 (defn truthy? [value]
   (or (= value true) (= value "true")))
@@ -90,32 +119,34 @@
           matches (re-find pattern block-string)]
       (second matches))))
 
-;; Render-string positional args: style, status-text, show-percent, exclude-blockrefs
-(defn format-render-string [current-string style status-text show-percent exclude-blockrefs]
+;; Render-string positional args: style, status-text, show-percent, exclude-blockrefs, show-hill-labels
+(defn format-render-string [current-string style status-text show-percent exclude-blockrefs show-hill-labels]
   (if-let [code-block-uid (get-component-code-uid current-string)]
     (let [pattern #"\{\{(?:\[\[)?roam/render(?:\]\])?: *\(\([^)]+\)\).*?\}\}"
           replacement (str "{{roam/render: ((" code-block-uid ")) \""
                            style "\" \""
                            status-text "\" \""
                            show-percent "\" \""
-                           exclude-blockrefs "\"}}")]
+                           exclude-blockrefs "\" \""
+                           show-hill-labels "\"}}")]
       (str/replace current-string pattern replacement))
     current-string))
 
-(defn update-block-string [block-uid style status-text show-percent exclude-blockrefs]
+(defn update-block-string [block-uid style status-text show-percent exclude-blockrefs show-hill-labels]
   (let [current-block @(dr/pull '[:block/string] [:block/uid block-uid])
         current-string (:block/string current-block)
-        new-string (format-render-string current-string style status-text show-percent exclude-blockrefs)]
+        new-string (format-render-string current-string style status-text show-percent exclude-blockrefs show-hill-labels)]
     (when (not= current-string new-string)
       (block/update
        {:block {:uid block-uid
                 :string new-string}}))))
 
-(defn settings-menu [block-uid current-style current-status-text current-show-percent current-exclude-blockrefs on-close]
+(defn settings-menu [block-uid current-style current-status-text current-show-percent current-exclude-blockrefs current-show-hill-labels on-close]
   (let [*style (r/atom current-style)
         *status-text (r/atom current-status-text)
         *show-percent (r/atom current-show-percent)
-        *exclude-blockrefs (r/atom current-exclude-blockrefs)]
+        *exclude-blockrefs (r/atom current-exclude-blockrefs)
+        *show-hill-labels (r/atom current-show-hill-labels)]
     (fn []
       [:div.bp3-card.dont-focus-block {:style {:padding "10px" :min-width "250px"}
                                        :on-click (fn [e] (.stopPropagation e))}
@@ -125,7 +156,8 @@
                     :class "dont-focus-block"
                     :onChange #(reset! *style (.. % -target -value))
                     :options [{:value "horizontal" :label "Horizontal Bar"}
-                              {:value "radial" :label "Radial/Circle"}]}]]
+                              {:value "radial" :label "Radial/Circle"}
+                              {:value "hill" :label "Hill Diagram"}]}]]
 
        [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
         [:label.bp3-label.dont-focus-block "Status Text"]
@@ -147,6 +179,13 @@
                     :class "dont-focus-block"
                     :onChange #(reset! *exclude-blockrefs (str (.. % -target -checked)))}]]
 
+       (when (= @*style "hill")
+         [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
+          [:label.bp3-label.dont-focus-block "Show Hill Labels"]
+          [bp-switch {:checked (truthy? @*show-hill-labels)
+                      :class "dont-focus-block"
+                      :onChange #(reset! *show-hill-labels (str (.. % -target -checked)))}]])
+
        [:div.button-group.dont-focus-block {:style {:display "flex" :justify-content "flex-end" :gap "8px"}}
         [bp-button {:onClick on-close
                     :class "dont-focus-block"
@@ -157,7 +196,7 @@
                     :onClick (fn [e]
                                (.stopPropagation e)
                                (.preventDefault e)
-                               (update-block-string block-uid @*style @*status-text @*show-percent @*exclude-blockrefs)
+                               (update-block-string block-uid @*style @*status-text @*show-percent @*exclude-blockrefs @*show-hill-labels)
                                (on-close))}
          "Apply"]]])))
 
@@ -243,6 +282,92 @@
                       (.stopPropagation e)
                       (on-settings-click))}]]]])))
 
+(defn hill-progress-bar [done total status-text show-percent show-hill-labels on-settings-click]
+  (r/with-let [*hovered? (r/atom false)]
+    (let [percentage (if (zero? total) 0 (* (/ done total) 100))
+          [dot-x dot-y] (hill-dot-pos percentage)
+          label-y (+ hill-baseline 12)
+          peak-y (hill-gaussian-y hill-center)
+          pole-top (+ peak-y 15)
+          pole-bot hill-baseline
+          done? (>= percentage 100)
+          accent "var(--circle-fill, #0d8050)"]
+      [:span {:style {:display "inline-flex"
+                      :align-items "center"
+                      :gap "8px"
+                      :vertical-align "middle"}
+              :on-mouse-enter #(reset! *hovered? true)
+              :on-mouse-leave #(reset! *hovered? false)}
+       [:div {:style {:resize "horizontal"
+                      :overflow "hidden"
+                      :display "inline-block"
+                      :min-width "80px"
+                      :width (str hill-w "px")}}
+        [:svg {:width "100%"
+               :style {:display "block"
+                       :aspect-ratio (str hill-w " / " hill-h)
+                       :overflow "visible"}
+               :viewBox (str "0 0 " hill-w " " hill-h)}
+         ;; Baseline
+         [:line {:x1 0 :y1 hill-baseline :x2 hill-w :y2 hill-baseline
+                 :stroke "#ccc" :stroke-width "0.5"}]
+         ;; Bell curve — turns accent color when done
+         [:path {:d (make-hill-path)
+                 :fill "none"
+                 :stroke (if done? accent "#aaa")
+                 :stroke-width "1.5"}]
+         ;; Center divider
+         [:line {:x1 hill-center :y1 peak-y
+                 :x2 hill-center :y2 hill-baseline
+                 :stroke "#ccc" :stroke-width "0.75"
+                 :stroke-dasharray "3,2"}]
+         ;; Labels (optional)
+         (when (truthy? show-hill-labels)
+           [:g
+            [:text {:x 2 :y label-y
+                    :font-size "6" :fill "#aaa"
+                    :font-family "sans-serif"
+                    :letter-spacing "0.4"}
+             "FIGURING THINGS OUT"]
+            [:text {:x (- hill-w 2) :y label-y
+                    :font-size "6" :fill "#aaa"
+                    :font-family "sans-serif"
+                    :text-anchor "end"
+                    :letter-spacing "0.4"}
+             "MAKING IT HAPPEN"]])
+         ;; Summit flag — centered between peak and baseline, only at 100%
+         (when done?
+           [:g
+            [:line {:x1 hill-center :y1 pole-top
+                    :x2 hill-center :y2 pole-bot
+                    :stroke accent :stroke-width "3.5"}]
+            [:polygon {:points (str hill-center "," pole-top " "
+                                    (+ hill-center 14) "," (+ pole-top 9) " "
+                                    hill-center "," (+ pole-top 18))
+                       :fill accent}]])
+         ;; Dot
+         [:circle {:cx dot-x :cy dot-y :r hill-dot-r
+                   :fill accent}]]]
+       [:span {:style {:white-space "nowrap"
+                       :display "inline-flex"
+                       :align-items "center"}}
+        [:span (str done "/" total " " status-text
+                    (when (truthy? show-percent)
+                      (str " - " (if (zero? total) 0 (int percentage)) "%")))]
+        [:span {:style {:max-width (if @*hovered? "30px" "0px")
+                        :overflow "hidden"
+                        :margin-left (if @*hovered? "8px" "0")
+                        :transition "all 0.3s ease-in-out"
+                        :opacity (if @*hovered? "1" "0")
+                        :display "inline-block"}}
+         [bp-button {:icon "cog"
+                     :class "dont-focus-block"
+                     :minimal true
+                     :small true
+                     :onClick (fn [e]
+                                (.stopPropagation e)
+                                (on-settings-click))}]]]])))
+
 (defn extension-running? []
   (try
     (boolean (.-running js/window.todoProgressBarExtensionData))
@@ -286,6 +411,7 @@
             status-text (or (second args) "Done")
             show-percent (or (nth args 2 nil) "false")
             exclude-blockrefs (or (nth args 3 nil) "false")
+            show-hill-labels (or (nth args 4 nil) "true")
             tasks (progress-counts block-uid (truthy? exclude-blockrefs))
             total (+ (:todo tasks) (:done tasks))]
         [:span.dont-focus-block {:on-click (fn [e] (.stopPropagation e))}
@@ -300,12 +426,17 @@
                                    status-text
                                    show-percent
                                    exclude-blockrefs
+                                   show-hill-labels
                                    #(reset! *settings-open? false)])}
-          (if (= style "radial")
+          (cond
+            (= style "radial")
             [circle-progress-bar (:done tasks) total status-text show-percent #(reset! *settings-open? true)]
+            (= style "hill")
+            [hill-progress-bar (:done tasks) total status-text show-percent show-hill-labels #(reset! *settings-open? true)]
+            :else
             [horizontal-progress-bar (:done tasks) total status-text show-percent #(reset! *settings-open? true)])]])))
     (finally
       (when-let [interval-id @*check-interval]
         (js/clearInterval interval-id))
       (when-let [timeout-id @*check-timeout]
-        (js/clearTimeout timeout-id))))))
+        (js/clearTimeout timeout-id)))))
