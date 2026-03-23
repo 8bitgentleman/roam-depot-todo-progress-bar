@@ -3,18 +3,21 @@
 A highly customizable visual progress bar component for tracking TODOs in your Roam Research graph.
 
 ## Features
-- Track TODO/DONE items within a block and its children
-- Choose between horizontal or radial (circle) visualization styles
+- Track TODO/DONE items within a block and all its children
+- Three visualization styles: horizontal bar, radial circle, and hill diagram
+- Hill diagram shows progress as a dot moving over a bell curve — left side is planning, right side is execution
+- Multi-task hill mode: each top-level child block gets its own colored dot
 - Customizable status text label
-- Option to include embedded blocks in counting
-- Inline compatibility - works within text without breaking lines
-- Configurable through an easy-to-use settings menu
+- Option to show completion percentage
+- Option to exclude embedded/reference-only blocks from counting
+- Inline compatibility — works within text without breaking lines
+- Configurable through a built-in settings menu
 - Real-time progress tracking
 
-## Example 
+## Example
 <img src="https://github.com/8bitgentleman/roam-depot-todo-progress-bar/raw/main/example.gif" max-width="400"></img>
 
-## Setup 
+## Setup
 First make sure that __User code__ is enabled in your settings. This allows custom components in your graph.
 
 <img src="https://github.com/8bitgentleman/roam-depot-todo-progress-bar/raw/main/settings.png" width="300"></img>
@@ -27,17 +30,33 @@ The easiest way to insert the component is through Roam's native template menu. 
 ## Customization
 
 ### Using the Settings Menu
-The component now includes a built-in settings menu accessible by hovering over the progress bar and clicking the gear icon that appears:
+The component includes a built-in settings menu. Hover over the progress bar and click the gear icon that appears:
 
 <img src="https://github.com/8bitgentleman/roam-depot-todo-progress-bar/raw/main/settings-menu-example.png" width="300"></img>
 
-In the settings menu, you can:
-- Change between horizontal and radial display styles
-- Customize the status text
-- Toggle whether to include embedded blocks in the count
+In the settings menu you can:
+- Switch between horizontal bar, radial circle, and hill diagram styles
+- Customize the status text label
+- Toggle percentage display
+- Exclude reference-only blocks from the count
+- *(Hill only)* Show or hide the phase labels beneath the curve
+- *(Hill only)* Enable multi-task mode
 
 ### Manual Customization
-You can also manually customize the component by passing parameters:
+Parameters are passed positionally as quoted strings after the component UID.
+
+```
+{{roam/render: ((UID)) "style" "status-text" "show-percent" "exclude-blockrefs" "show-hill-labels" "multi-task"}}
+```
+
+| Position | Parameter | Default | Options |
+|---|---|---|---|
+| 1 | style | `horizontal` | `horizontal`, `radial`, `hill` |
+| 2 | status text | `Done` | any string |
+| 3 | show percent | `false` | `true`, `false` |
+| 4 | exclude block refs | `false` | `true`, `false` |
+| 5 | show hill labels | `true` | `true`, `false` *(hill only)* |
+| 6 | multi-task mode | `false` | `true`, `false` *(hill only)* |
 
 #### Basic Usage
 ```
@@ -45,27 +64,60 @@ You can also manually customize the component by passing parameters:
 ```
 
 #### Visualization Style
-Choose between "horizontal" (default) or "radial" display:
 ```
 {{[[roam/render]]:((roam-render-todo-progress-cljs)) "radial"}}
+{{[[roam/render]]:((roam-render-todo-progress-cljs)) "hill"}}
 ```
 
 #### Custom Label
-Change the status text (default is "Done"):
 ```
 {{[[roam/render]]:((roam-render-todo-progress-cljs)) "horizontal" "Complete"}}
 ```
 
-#### Include Embedded Blocks
-Count TODOs in embedded blocks as well:
+#### Embedded Blocks
+By default the component scans all child blocks **including** pure block references (embeds like `((block-uid))`). To exclude reference-only blocks from the count, set the 4th parameter to `"true"`:
 ```
-{{[[roam/render]]:((roam-render-todo-progress-cljs)) "horizontal" "Done" "include-embeds"}}
+{{[[roam/render]]:((roam-render-todo-progress-cljs)) "horizontal" "Done" "false" "true"}}
 ```
 
-## How It Works
-The progress bar scans through the block where it's placed and all child blocks, counting TODO and DONE markers. It then calculates completion percentage and visualizes it accordingly.
+---
 
-When the "include-embeds" option is enabled, it will also scan through any embedded blocks to count their TODOs as well.
+## Hill Diagram
+
+The hill diagram visualizes work as a dot moving over a bell curve. The left half represents the "figuring things out" phase and the right half represents the "making it happen" phase. A summit flag appears when all TODOs are done.
+
+### Flat mode (default)
+All TODOs under the block are treated as one task. A single dot moves across the hill as work is completed.
+
+```
+{{[[roam/render]]:((roam-render-todo-progress-cljs)) "hill"}}
+```
+
+### Multi-task mode
+Each direct child block is treated as a separate task. Sub-blocks at any depth below each child are counted as that task's TODOs. Each task gets its own colored dot — hover over a dot to see the task name.
+
+```
+{{[[roam/render]]:((roam-render-todo-progress-cljs)) "hill" "Done" "false" "false" "true" "true"}}
+```
+
+Example structure:
+```
+- {{roam/render: ...}} "hill" ... "true"}}
+    - Write the proposal
+        - {{TODO}} Draft outline
+        - {{TODO}} Add budget section
+        - {{DONE}} Executive summary
+    - Review feedback
+        - {{DONE}} Collect comments
+        - {{TODO}} Revise draft
+    - Final delivery
+        - {{TODO}} Format document
+        - {{TODO}} Send to stakeholders
+```
+
+Each of the three top-level blocks ("Write the proposal", "Review feedback", "Final delivery") becomes its own dot on the hill, colored and independently positioned based on its own TODO/DONE ratio.
+
+---
 
 ## Troubleshooting
 If you're having issues with the component:

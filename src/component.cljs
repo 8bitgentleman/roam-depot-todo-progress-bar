@@ -255,12 +255,16 @@
            [:label.bp3-label.dont-focus-block "Show Hill Labels"]
            [bp-switch {:checked (truthy? @*show-hill-labels)
                        :class "dont-focus-block"
-                       :onChange #(reset! *show-hill-labels (str (.. % -target -checked)))}]]
+                       :onChange #(reset! *show-hill-labels (str (.. % -target -checked)))}]
+           [:div.bp3-form-helper-text.dont-focus-block {:style {:margin-top "2px" :font-size "11px" :color "#888"}}
+            "Show \"Figuring Things Out\" and \"Making It Happen\" phase labels beneath the curve."]]
           [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
            [:label.bp3-label.dont-focus-block "Multi-task Mode"]
            [bp-switch {:checked (truthy? @*multi-task)
                        :class "dont-focus-block"
-                       :onChange #(reset! *multi-task (str (.. % -target -checked)))}]]])
+                       :onChange #(reset! *multi-task (str (.. % -target -checked)))}]
+           [:div.bp3-form-helper-text.dont-focus-block {:style {:margin-top "2px" :font-size "11px" :color "#888"}}
+            "Each top-level child block becomes a separate task with its own colored dot on the hill."]]])
 
        [:div.button-group.dont-focus-block {:style {:display "flex" :justify-content "flex-end" :gap "8px"}}
         [bp-button {:onClick on-close
