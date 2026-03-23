@@ -20,6 +20,12 @@
 (def hill-center (/ hill-w 2))
 (def hill-sigma 40)
 
+;; Multi-task color palette
+(def task-colors ["#0d8050" "#1d7aad" "#bf7326" "#a82a2a" "#5c4485" "#00827c"])
+
+(defn get-task-color [idx]
+  (nth task-colors (mod idx (count task-colors))))
+
 (defn hill-gaussian-y [x]
   (let [dx (- x hill-center)]
     (- hill-baseline (* hill-amplitude (js/Math.exp (- (/ (* dx dx) (* 2 hill-sigma hill-sigma))))))))
@@ -107,6 +113,68 @@
                               [0 0])]
           (recur next-stack (+ todo todo+) (+ done done+)))))))
 
+(defn progress-counts-multi [block-uid exclude-blockrefs?]
+  (let [root @(dr/pull '[:block/string
+                         {:block/refs [:node/title {:block/refs [:node/title]}]}
+                         {:block/children ...}]
+                       [:block/uid block-uid])]
+    (->> (:block/children root)
+         (map (fn [child]
+                (let [counts (loop [stack [child]
+                                    todo 0
+                                    done 0]
+                               (if (empty? stack)
+                                 {:todo todo :done done}
+                                 (let [node (peek stack)
+                                       next-stack (into (pop stack) (:block/children node))
+                                       include? (or (not exclude-blockrefs?)
+                                                    (not (is-block-ref? (:block/string node))))
+                                       [t+ d+] (if include?
+                                                  (count-status-from-block node)
+                                                  [0 0])]
+                                   (recur next-stack (+ todo t+) (+ done d+)))))]
+                  (assoc counts :name (:block/string child)))))
+         (filter #(> (+ (:todo %) (:done %)) 0))
+         vec)))
+
+(defn strip-roam-markup [s]
+  (when s
+    (-> s
+        (str/replace #"\{\{(?:\[\[)?(?:TODO|DONE)(?:\]\])?\}\}" "")
+        (str/replace #"#\[\[([^\]]+)\]\]" "$1")
+        (str/replace #"\[\[([^\]]+)\]\]" "$1")
+        (str/replace #"\*\*([^*]*)\*\*" "$1")
+        (str/replace #"__([^_]*)__" "$1")
+        (str/replace #"\^\^([^^]*)\^\^" "$1")
+        (str/replace #"~~([^~]*)~~" "$1")
+        (str/replace #"\(\([^)]+\)\)" "")
+        (str/replace #"#\S+" "")
+        str/trim)))
+
+(defn truncate-str [s max-len]
+  (if (and s (> (count s) max-len))
+    (str (subs s 0 max-len) "…")
+    (or s "")))
+
+(defn spread-group [group step]
+  (let [n (count group)]
+    (map-indexed (fn [i item]
+                   (update item :y + (* step (- i (/ (dec n) 2.0)))))
+                 group)))
+
+(defn apply-jitter [items threshold step]
+  (loop [remaining items
+         result []
+         group []]
+    (if (empty? remaining)
+      (into result (spread-group group step))
+      (let [current (first remaining)
+            last-g (last group)]
+        (if (or (empty? group)
+                (< (js/Math.abs (- (:x current) (:x last-g))) threshold))
+          (recur (rest remaining) result (conj group current))
+          (recur (rest remaining) (into result (spread-group group step)) [current]))))))
+
 (def bp-button (r/adapt-react-class bp-core/Button))
 (def bp-popover (r/adapt-react-class bp-core/Popover))
 (def bp-select (r/adapt-react-class bp-core/HTMLSelect))
@@ -119,8 +187,8 @@
           matches (re-find pattern block-string)]
       (second matches))))
 
-;; Render-string positional args: style, status-text, show-percent, exclude-blockrefs, show-hill-labels
-(defn format-render-string [current-string style status-text show-percent exclude-blockrefs show-hill-labels]
+;; Render-string positional args: style, status-text, show-percent, exclude-blockrefs, show-hill-labels, multi-task
+(defn format-render-string [current-string style status-text show-percent exclude-blockrefs show-hill-labels multi-task]
   (if-let [code-block-uid (get-component-code-uid current-string)]
     (let [pattern #"\{\{(?:\[\[)?roam/render(?:\]\])?: *\(\([^)]+\)\).*?\}\}"
           replacement (str "{{roam/render: ((" code-block-uid ")) \""
@@ -128,25 +196,27 @@
                            status-text "\" \""
                            show-percent "\" \""
                            exclude-blockrefs "\" \""
-                           show-hill-labels "\"}}")]
+                           show-hill-labels "\" \""
+                           multi-task "\"}}")]
       (str/replace current-string pattern replacement))
     current-string))
 
-(defn update-block-string [block-uid style status-text show-percent exclude-blockrefs show-hill-labels]
+(defn update-block-string [block-uid style status-text show-percent exclude-blockrefs show-hill-labels multi-task]
   (let [current-block @(dr/pull '[:block/string] [:block/uid block-uid])
         current-string (:block/string current-block)
-        new-string (format-render-string current-string style status-text show-percent exclude-blockrefs show-hill-labels)]
+        new-string (format-render-string current-string style status-text show-percent exclude-blockrefs show-hill-labels multi-task)]
     (when (not= current-string new-string)
       (block/update
        {:block {:uid block-uid
                 :string new-string}}))))
 
-(defn settings-menu [block-uid current-style current-status-text current-show-percent current-exclude-blockrefs current-show-hill-labels on-close]
+(defn settings-menu [block-uid current-style current-status-text current-show-percent current-exclude-blockrefs current-show-hill-labels current-multi-task on-close]
   (let [*style (r/atom current-style)
         *status-text (r/atom current-status-text)
         *show-percent (r/atom current-show-percent)
         *exclude-blockrefs (r/atom current-exclude-blockrefs)
-        *show-hill-labels (r/atom current-show-hill-labels)]
+        *show-hill-labels (r/atom current-show-hill-labels)
+        *multi-task (r/atom current-multi-task)]
     (fn []
       [:div.bp3-card.dont-focus-block {:style {:padding "10px" :min-width "250px"}
                                        :on-click (fn [e] (.stopPropagation e))}
@@ -180,11 +250,17 @@
                     :onChange #(reset! *exclude-blockrefs (str (.. % -target -checked)))}]]
 
        (when (= @*style "hill")
-         [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
-          [:label.bp3-label.dont-focus-block "Show Hill Labels"]
-          [bp-switch {:checked (truthy? @*show-hill-labels)
-                      :class "dont-focus-block"
-                      :onChange #(reset! *show-hill-labels (str (.. % -target -checked)))}]])
+         [:<>
+          [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
+           [:label.bp3-label.dont-focus-block "Show Hill Labels"]
+           [bp-switch {:checked (truthy? @*show-hill-labels)
+                       :class "dont-focus-block"
+                       :onChange #(reset! *show-hill-labels (str (.. % -target -checked)))}]]
+          [:div.setting-group.dont-focus-block {:style {:margin-bottom "15px"}}
+           [:label.bp3-label.dont-focus-block "Multi-task Mode"]
+           [bp-switch {:checked (truthy? @*multi-task)
+                       :class "dont-focus-block"
+                       :onChange #(reset! *multi-task (str (.. % -target -checked)))}]]])
 
        [:div.button-group.dont-focus-block {:style {:display "flex" :justify-content "flex-end" :gap "8px"}}
         [bp-button {:onClick on-close
@@ -196,7 +272,7 @@
                     :onClick (fn [e]
                                (.stopPropagation e)
                                (.preventDefault e)
-                               (update-block-string block-uid @*style @*status-text @*show-percent @*exclude-blockrefs @*show-hill-labels)
+                               (update-block-string block-uid @*style @*status-text @*show-percent @*exclude-blockrefs @*show-hill-labels @*multi-task)
                                (on-close))}
          "Apply"]]])))
 
@@ -282,8 +358,9 @@
                       (.stopPropagation e)
                       (on-settings-click))}]]]])))
 
-(defn hill-progress-bar [done total status-text show-percent show-hill-labels on-settings-click]
-  (r/with-let [*hovered? (r/atom false)]
+(defn hill-progress-bar [done total status-text show-percent show-hill-labels multi-tasks on-settings-click]
+  (r/with-let [*hovered? (r/atom false)
+               *hovered-idx (r/atom nil)]
     (let [percentage (if (zero? total) 0 (* (/ done total) 100))
           [dot-x dot-y] (hill-dot-pos percentage)
           label-y (+ hill-baseline 12)
@@ -291,63 +368,122 @@
           pole-top (+ peak-y 15)
           pole-bot hill-baseline
           done? (>= percentage 100)
-          accent "var(--circle-fill, #0d8050)"]
+          accent "var(--circle-fill, #0d8050)"
+          positioned-tasks (when (seq multi-tasks)
+                             (let [with-pos (map-indexed
+                                             (fn [i t]
+                                               (let [total-t (+ (:todo t) (:done t))
+                                                     pct (if (zero? total-t) 0 (* (/ (:done t) total-t) 100))
+                                                     [x y] (hill-dot-pos pct)]
+                                                 (assoc t :x x :y y :color (get-task-color i) :idx i)))
+                                             multi-tasks)
+                                   sorted (sort-by :x with-pos)]
+                               (apply-jitter sorted 8 5)))
+          task-by-idx (when positioned-tasks
+                        (into {} (map (juxt :idx identity) positioned-tasks)))]
       [:span {:style {:display "inline-flex"
                       :align-items "center"
                       :gap "8px"
                       :vertical-align "middle"}
               :on-mouse-enter #(reset! *hovered? true)
               :on-mouse-leave #(reset! *hovered? false)}
-       [:div {:style {:resize "horizontal"
-                      :overflow "hidden"
-                      :display "inline-block"
-                      :min-width "80px"
-                      :width (str hill-w "px")}}
-        [:svg {:width "100%"
-               :style {:display "block"
-                       :aspect-ratio (str hill-w " / " hill-h)
-                       :overflow "visible"}
-               :viewBox (str "0 0 " hill-w " " hill-h)}
+       [:div.hill-diagram {:style {:resize "horizontal"
+                                   :overflow "hidden"
+                                   :display "inline-block"
+                                   :min-width "80px"
+                                   :width (str hill-w "px")}}
+        [:svg.hill-diagram__svg
+         {:width "100%"
+          :style {:display "block"
+                  :aspect-ratio (str hill-w " / " hill-h)
+                  :overflow "visible"}
+          :viewBox (str "0 0 " hill-w " " hill-h)}
          ;; Baseline
-         [:line {:x1 0 :y1 hill-baseline :x2 hill-w :y2 hill-baseline
-                 :stroke "#ccc" :stroke-width "0.5"}]
-         ;; Bell curve — turns accent color when done
-         [:path {:d (make-hill-path)
-                 :fill "none"
-                 :stroke (if done? accent "#aaa")
-                 :stroke-width "1.5"}]
+         [:line.hill-diagram__baseline
+          {:x1 0 :y1 hill-baseline :x2 hill-w :y2 hill-baseline
+           :stroke "#ccc" :stroke-width "0.5"}]
+         ;; Bell curve — turns accent color when done (flat mode only)
+         [:path.hill-diagram__curve
+          {:d (make-hill-path)
+           :fill "none"
+           :stroke (if (and (nil? multi-tasks) done?) accent "#aaa")
+           :stroke-width "1.5"}]
          ;; Center divider
-         [:line {:x1 hill-center :y1 peak-y
-                 :x2 hill-center :y2 hill-baseline
-                 :stroke "#ccc" :stroke-width "0.75"
-                 :stroke-dasharray "3,2"}]
+         [:line.hill-diagram__divider
+          {:x1 hill-center :y1 peak-y
+           :x2 hill-center :y2 hill-baseline
+           :stroke "#ccc" :stroke-width "0.75"
+           :stroke-dasharray "3,2"}]
          ;; Labels (optional)
          (when (truthy? show-hill-labels)
-           [:g
-            [:text {:x 2 :y label-y
-                    :font-size "6" :fill "#aaa"
-                    :font-family "sans-serif"
-                    :letter-spacing "0.4"}
+           [:g.hill-diagram__labels
+            [:text.hill-diagram__label.hill-diagram__label--left
+             {:x 2 :y label-y
+              :font-size "6" :fill "#aaa"
+              :font-family "sans-serif"
+              :letter-spacing "0.4"}
              "FIGURING THINGS OUT"]
-            [:text {:x (- hill-w 2) :y label-y
-                    :font-size "6" :fill "#aaa"
-                    :font-family "sans-serif"
-                    :text-anchor "end"
-                    :letter-spacing "0.4"}
+            [:text.hill-diagram__label.hill-diagram__label--right
+             {:x (- hill-w 2) :y label-y
+              :font-size "6" :fill "#aaa"
+              :font-family "sans-serif"
+              :text-anchor "end"
+              :letter-spacing "0.4"}
              "MAKING IT HAPPEN"]])
-         ;; Summit flag — centered between peak and baseline, only at 100%
+         ;; Summit flag — shown in both modes when all tasks complete
          (when done?
-           [:g
-            [:line {:x1 hill-center :y1 pole-top
-                    :x2 hill-center :y2 pole-bot
-                    :stroke accent :stroke-width "3.5"}]
-            [:polygon {:points (str hill-center "," pole-top " "
-                                    (+ hill-center 14) "," (+ pole-top 9) " "
-                                    hill-center "," (+ pole-top 18))
-                       :fill accent}]])
-         ;; Dot
-         [:circle {:cx dot-x :cy dot-y :r hill-dot-r
-                   :fill accent}]]]
+           [:g.hill-diagram__flag
+            [:line.hill-diagram__flag-pole
+             {:x1 hill-center :y1 pole-top
+              :x2 hill-center :y2 pole-bot
+              :stroke accent :stroke-width "3.5"}]
+            [:polygon.hill-diagram__flag-pennant
+             {:points (str hill-center "," pole-top " "
+                           (+ hill-center 14) "," (+ pole-top 9) " "
+                           hill-center "," (+ pole-top 18))
+              :fill accent}]])
+         ;; Flat mode: single dot
+         (when (nil? multi-tasks)
+           [:circle.hill-diagram__dot
+            {:cx dot-x :cy dot-y :r hill-dot-r
+             :fill accent}])
+         ;; Multi-task mode: one colored dot per task + hover tooltip
+         (when (seq positioned-tasks)
+           [:g.hill-diagram__dots
+            (for [t positioned-tasks]
+              ^{:key (:idx t)}
+              [:circle.hill-diagram__dot.hill-diagram__dot--task
+               {:cx (:x t)
+                :cy (:y t)
+                :r hill-dot-r
+                :fill (:color t)
+                :style {:cursor "pointer"}
+                :on-mouse-enter (fn [e]
+                                  (.stopPropagation e)
+                                  (reset! *hovered-idx (:idx t)))
+                :on-mouse-leave (fn [e]
+                                  (.stopPropagation e)
+                                  (reset! *hovered-idx nil))}])
+            (when-let [idx @*hovered-idx]
+              (let [t (get task-by-idx idx)]
+                (when t
+                  (let [label (truncate-str (strip-roam-markup (:name t)) 30)
+                        tooltip-w 150
+                        tooltip-h 18
+                        tx (min (- hill-w tooltip-w 2) (max 2 (- (:x t) (/ tooltip-w 2))))
+                        ty (- (:y t) hill-dot-r tooltip-h 3)]
+                    [:g.hill-diagram__tooltip {:pointer-events "none"}
+                     [:rect.hill-diagram__tooltip-bg
+                      {:x tx :y ty
+                       :width tooltip-w :height tooltip-h
+                       :rx 3 :ry 3
+                       :fill "rgba(0,0,0,0.75)"}]
+                     [:text.hill-diagram__tooltip-text
+                      {:x (+ tx 6) :y (+ ty 12)
+                       :font-size "9"
+                       :fill "white"
+                       :font-family "sans-serif"}
+                      label]]))))])]]
        [:span {:style {:white-space "nowrap"
                        :display "inline-flex"
                        :align-items "center"}}
@@ -412,7 +548,13 @@
             show-percent (or (nth args 2 nil) "false")
             exclude-blockrefs (or (nth args 3 nil) "false")
             show-hill-labels (or (nth args 4 nil) "true")
-            tasks (progress-counts block-uid (truthy? exclude-blockrefs))
+            multi-task (or (nth args 5 nil) "false")
+            multi-tasks (when (and (= style "hill") (truthy? multi-task))
+                          (progress-counts-multi block-uid (truthy? exclude-blockrefs)))
+            tasks (if multi-tasks
+                    {:todo (reduce + (map :todo multi-tasks))
+                     :done (reduce + (map :done multi-tasks))}
+                    (progress-counts block-uid (truthy? exclude-blockrefs)))
             total (+ (:todo tasks) (:done tasks))]
         [:span.dont-focus-block {:on-click (fn [e] (.stopPropagation e))}
          [bp-popover
@@ -427,12 +569,13 @@
                                    show-percent
                                    exclude-blockrefs
                                    show-hill-labels
+                                   multi-task
                                    #(reset! *settings-open? false)])}
           (cond
             (= style "radial")
             [circle-progress-bar (:done tasks) total status-text show-percent #(reset! *settings-open? true)]
             (= style "hill")
-            [hill-progress-bar (:done tasks) total status-text show-percent show-hill-labels #(reset! *settings-open? true)]
+            [hill-progress-bar (:done tasks) total status-text show-percent show-hill-labels multi-tasks #(reset! *settings-open? true)]
             :else
             [horizontal-progress-bar (:done tasks) total status-text show-percent #(reset! *settings-open? true)])]])))
     (finally

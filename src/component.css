@@ -58,3 +58,59 @@ progress::-webkit-progress-value,
 .progress-circle path {
   fill: var(--circle-fill);
 }
+
+/* ─── Hill diagram styles ──────────────────────────────────────────────────── */
+
+/* Outer wrapper div containing the resizable SVG */
+.hill-diagram {}
+
+/* The SVG element itself */
+.hill-diagram__svg {}
+
+/* Horizontal baseline at the bottom of the hill */
+.hill-diagram__baseline {}
+
+/* The gaussian bell curve path */
+.hill-diagram__curve {}
+
+/* Dashed vertical center divider (left = figuring out, right = making it happen) */
+.hill-diagram__divider {}
+
+/* Group containing both phase label texts */
+.hill-diagram__labels {}
+
+/* Phase label text elements */
+.hill-diagram__label {}
+
+/* "FIGURING THINGS OUT" label on the left */
+.hill-diagram__label--left {}
+
+/* "MAKING IT HAPPEN" label on the right */
+.hill-diagram__label--right {}
+
+/* Group containing flag pole + pennant (visible only when 100% complete) */
+.hill-diagram__flag {}
+
+/* Vertical pole line of the summit flag */
+.hill-diagram__flag-pole {}
+
+/* Triangular pennant polygon of the summit flag */
+.hill-diagram__flag-pennant {}
+
+/* Progress dot — applies to both flat and multi-task modes */
+.hill-diagram__dot {}
+
+/* Group containing all task dots in multi-task mode */
+.hill-diagram__dots {}
+
+/* Modifier on individual dots in multi-task mode */
+.hill-diagram__dot--task {}
+
+/* Tooltip group that appears on dot hover in multi-task mode */
+.hill-diagram__tooltip {}
+
+/* Dark rounded rectangle behind the tooltip text */
+.hill-diagram__tooltip-bg {}
+
+/* Task name text inside the tooltip */
+.hill-diagram__tooltip-text {}
